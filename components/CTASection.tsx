@@ -14,13 +14,13 @@ export default function CTASection() {
             Join thousands of happy hosts and make your next event unforgettable.
           </p>
           <button
-            onClick={() => openWhatsApp("Hi! I'd like to create a free invitation now.")}
+            onClick={() => openWhatsApp("Hi! I'd like to create a invitation now.")}
             className="bg-white text-purple-600 px-8 py-4 rounded-full text-lg font-semibold hover:bg-gray-100 transition-all transform hover:scale-105 shadow-xl"
           >
-            Create Your Free Invitation Now
+            Create Your Invitation Now
           </button>
           <p className="text-sm text-white/80 mt-4">
-            No credit card required • Free forever plan available
+            No credit card required • forever plan available
           </p>
         </div>
       </div>
