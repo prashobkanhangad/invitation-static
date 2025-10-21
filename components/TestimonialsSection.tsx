@@ -43,7 +43,7 @@ export default function TestimonialsSection() {
   };
 
   return (
-    <section className="py-20 bg-purple-50">
+    <section className="py-20 bg-[#F5F5F0]">
       <div className="container mx-auto px-4 sm:px-6 lg:px-8">
         <h2 className="text-3xl md:text-4xl font-bold text-center text-gray-900 mb-12">
           Loved by hosts everywhere.
@@ -51,7 +51,7 @@ export default function TestimonialsSection() {
 
         <div className="max-w-4xl mx-auto">
           <div className="relative bg-white rounded-2xl shadow-xl p-8 md:p-12">
-            <Quote className="absolute top-6 left-6 w-8 h-8 text-purple-200" />
+            <Quote className="absolute top-6 left-6 w-8 h-8 text-[#E5E5E0]" />
             
             <div className="relative">
               <div className="text-center mb-8">
@@ -60,7 +60,7 @@ export default function TestimonialsSection() {
                 </p>
                 
                 <div className="flex items-center justify-center space-x-4">
-                  <div className="w-12 h-12 bg-purple-600 rounded-full flex items-center justify-center text-white font-semibold">
+                  <div className="w-12 h-12 bg-[#333333] rounded-full flex items-center justify-center text-white font-semibold">
                     {testimonials[currentTestimonial].avatar}
                   </div>
                   <div className="text-left">
@@ -74,9 +74,9 @@ export default function TestimonialsSection() {
               <div className="flex justify-center items-center space-x-4">
                 <button
                   onClick={previousTestimonial}
-                  className="p-2 rounded-full bg-purple-100 hover:bg-purple-200 transition-colors"
+                  className="p-2 rounded-full bg-[#E5E5E0] hover:bg-[#D5D5D0] transition-colors"
                 >
-                  <ChevronLeft className="w-5 h-5 text-purple-600" />
+                  <ChevronLeft className="w-5 h-5 text-[#333333]" />
                 </button>
                 
                 <div className="flex space-x-2">
@@ -86,8 +86,8 @@ export default function TestimonialsSection() {
                       onClick={() => setCurrentTestimonial(index)}
                       className={`w-2 h-2 rounded-full transition-all ${
                         index === currentTestimonial
-                          ? "bg-purple-600 w-8"
-                          : "bg-purple-200"
+                          ? "bg-[#333333] w-8"
+                          : "bg-[#E5E5E0]"
                       }`}
                     />
                   ))}
@@ -95,9 +95,9 @@ export default function TestimonialsSection() {
                 
                 <button
                   onClick={nextTestimonial}
-                  className="p-2 rounded-full bg-purple-100 hover:bg-purple-200 transition-colors"
+                  className="p-2 rounded-full bg-[#E5E5E0] hover:bg-[#D5D5D0] transition-colors"
                 >
-                  <ChevronRight className="w-5 h-5 text-purple-600" />
+                  <ChevronRight className="w-5 h-5 text-[#333333]" />
                 </button>
               </div>
             </div>
@@ -105,7 +105,7 @@ export default function TestimonialsSection() {
           <div className="text-center mt-8">
             <button
               onClick={() => openWhatsApp("Hi! I read the testimonials and want to know more.")}
-              className="inline-block bg-purple-600 text-white px-8 py-3 rounded-full font-semibold hover:bg-purple-700 transition-colors"
+              className="inline-block bg-[#333333] text-white px-8 py-3 rounded-full font-semibold hover:bg-purple-700 transition-colors"
             >
               Chat with Us on WhatsApp
             </button>

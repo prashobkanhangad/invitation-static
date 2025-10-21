@@ -5,12 +5,12 @@ import { openWhatsApp } from "@/utils/whatsapp";
 
 export default function HeroSection() {
   return (
-    <section className="relative min-h-screen flex items-center pt-16 bg-gradient-to-br from-purple-50 via-white to-pink-50 overflow-hidden">
+    <section className="relative min-h-screen flex items-center pt-16 bg-gradient-to-br from-[#F5F5F0] via-white to-[#F5F5F0] overflow-hidden">
       {/* Animated celebration elements */}
       <div className="absolute inset-0 overflow-hidden">
         {/* Confetti pieces - distributed top to bottom */}
         <div className="absolute top-[10%] left-[10%] w-4 h-4 bg-pink-400 rounded-sm animate-float-slow opacity-60"></div>
-        <div className="absolute top-[25%] left-[80%] w-3 h-5 bg-purple-400 rounded-sm animate-float-medium opacity-50 rotate-45"></div>
+        <div className="absolute top-[25%] left-[80%] w-3 h-5 bg-[#333333] rounded-sm animate-float-medium opacity-50 rotate-45"></div>
         <div className="absolute top-[45%] left-[25%] w-3 h-4 bg-yellow-400 rounded-sm animate-float-fast opacity-60 -rotate-12"></div>
         <div className="absolute bottom-[35%] left-[60%] w-4 h-3 bg-blue-400 rounded-sm animate-float-slow opacity-50 rotate-90"></div>
         <div className="absolute bottom-[15%] left-[15%] w-3 h-4 bg-green-400 rounded-sm animate-float-medium opacity-60 rotate-180"></div>
@@ -26,12 +26,12 @@ export default function HeroSection() {
         <div className="absolute bottom-[10%] left-[20%] text-yellow-400 text-lg animate-pulse opacity-70">✨</div>
         
         {/* Stars - full screen coverage */}
-        <div className="absolute top-[30%] left-[50%] text-purple-400 text-xl animate-spin-slow opacity-50">★</div>
+        <div className="absolute top-[30%] left-[50%] text-[#333333] text-xl animate-spin-slow opacity-50">★</div>
         <div className="absolute bottom-[25%] left-[30%] text-blue-400 text-2xl animate-spin-slow opacity-40">★</div>
         <div className="absolute top-[8%] left-[65%] text-pink-400 text-lg animate-spin-slow opacity-60">★</div>
         
         {/* Dots - evenly distributed */}
-        <div className="absolute top-[18%] left-[75%] w-2 h-2 bg-purple-300 rounded-full animate-float-fast opacity-70"></div>
+        <div className="absolute top-[18%] left-[75%] w-2 h-2 bg-[#333333] rounded-full animate-float-fast opacity-70"></div>
         <div className="absolute top-[60%] left-[40%] w-3 h-3 bg-pink-300 rounded-full animate-float-slow opacity-60"></div>
         <div className="absolute bottom-[30%] left-[95%] w-2 h-2 bg-yellow-300 rounded-full animate-float-medium opacity-80"></div>
         <div className="absolute bottom-[8%] left-[55%] w-2 h-2 bg-blue-300 rounded-full animate-float-fast opacity-70"></div>
@@ -50,14 +50,14 @@ export default function HeroSection() {
             </p>
             <button
               onClick={() => openWhatsApp("Hi! I want to get started with invitations.")}
-              className="bg-purple-600 text-white px-8 py-4 rounded-full text-lg font-semibold hover:bg-purple-700 transition-all transform hover:scale-105 shadow-lg"
+              className="bg-[#333333] text-white px-8 py-4 rounded-full text-lg font-semibold hover:bg-[#555555] transition-all transform hover:scale-105 shadow-lg"
             >
               Get Started
             </button>
           </div>
           
           <div className="relative">
-            <div className="absolute inset-0 bg-gradient-to-r from-purple-400 to-pink-400 rounded-3xl blur-3xl opacity-20"></div>
+            <div className="absolute inset-0 bg-gradient-to-r from-[#333333] to-[#555555] rounded-3xl blur-3xl opacity-20"></div>
             <div className="relative grid grid-cols-2 gap-4">
               {/* Image column 1 */}
               <div className="space-y-4">

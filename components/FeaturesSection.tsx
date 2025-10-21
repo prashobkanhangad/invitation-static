@@ -34,8 +34,8 @@ export default function FeaturesSection() {
             const Icon = feature.icon;
             return (
               <div key={index} className="text-center group">
-                <div className="inline-flex items-center justify-center w-16 h-16 bg-purple-100 rounded-full mb-4 group-hover:bg-purple-200 transition-colors">
-                  <Icon className="w-8 h-8 text-purple-600" />
+                <div className="inline-flex items-center justify-center w-16 h-16 bg-[#F5F5F0] rounded-full mb-4 group-hover:bg-[#E5E5E0] transition-colors">
+                  <Icon className="w-8 h-8 text-[#333333]" />
                 </div>
                 <h3 className="text-xl font-semibold text-gray-900 mb-2">{feature.title}</h3>
                 <p className="text-gray-600">{feature.description}</p>
@@ -47,7 +47,7 @@ export default function FeaturesSection() {
         <div className="mt-12 text-center">
           <button
             onClick={() => openWhatsApp("Hi! Tell me more about your features.")}
-            className="inline-block bg-purple-600 text-white px-8 py-3 rounded-full font-semibold hover:bg-purple-700 transition-colors"
+            className="inline-block bg-[#333333] text-white px-8 py-3 rounded-full font-semibold hover:bg-[#555555] transition-colors"
           >
             Chat on WhatsApp
           </button>

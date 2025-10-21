@@ -44,7 +44,7 @@ export default function TemplatesSection() {
               onClick={() => setActiveCategory(category.id)}
               className={`px-6 py-2 rounded-full transition-all ${
                 activeCategory === category.id
-                  ? "bg-purple-600 text-white"
+                  ? "bg-[#333333] text-white"
                   : "bg-gray-100 text-gray-700 hover:bg-gray-200"
               }`}
             >
@@ -71,7 +71,7 @@ export default function TemplatesSection() {
                 <div className="absolute inset-0 bg-black/50 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
                   <button
                     onClick={() => openWhatsApp(`Hi! I want to use the template: ${template.title}`)}
-                    className="bg-white text-purple-600 px-6 py-2 rounded-full font-semibold transform -translate-y-2 group-hover:translate-y-0 transition-transform"
+                    className="bg-white text-[#333333] px-6 py-2 rounded-full font-semibold transform -translate-y-2 group-hover:translate-y-0 transition-transform"
                   >
                     Use Template
                   </button>
