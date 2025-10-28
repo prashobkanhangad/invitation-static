@@ -32,12 +32,7 @@ export default function Hero() {
           <p className="text-white/90 font-sans text-xl md:text-2xl mb-12">
             June 15, 2025 • Tuscany, Italy
           </p>
-          <button 
-            onClick={scrollToRSVP}
-            className="bg-[#333333] hover:bg-[#555555] text-white font-sans text-lg px-10 py-4 rounded-full shadow-lg transition-all hover:scale-105"
-          >
-            RSVP Now
-          </button>
+ 
         </div>
       </div>
 

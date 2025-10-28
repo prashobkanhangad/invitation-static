@@ -6,8 +6,8 @@ export default function Gallery() {
     { src: "/romanticpage/gallery-2.jpg", alt: "Wedding rings close-up" },
     { src: "/romanticpage/gallery-3.jpg", alt: "Elegant floral arrangement" },
     { src: "/romanticpage/hero-couple.jpg", alt: "Beautiful couple portrait" },
-    { src: "/romanticpage/quote-bg.jpg", alt: "Romantic moment together" },
-    { src: "/romanticpage/save-date.jpg", alt: "Save the date moment" },
+    { src: "/romanticpage/gallery-1.jpg", alt: "Romantic moment together" },
+    { src: "/romanticpage/gallery-2.jpg", alt: "Save the date moment" },
   ];
 
   return (
