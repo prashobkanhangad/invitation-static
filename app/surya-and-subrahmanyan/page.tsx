@@ -36,12 +36,6 @@ export const metadata: Metadata = {
         height: 630,
         alt: "Surya & Subrahmanyan Wedding Portrait",
       },
-      {
-        url: "/modern/gallery-1.jpg",
-        width: 1080,
-        height: 1080,
-        alt: "Surya & Subrahmanyan moments",
-      },
     ],
     locale: "en_US",
     type: "website",
