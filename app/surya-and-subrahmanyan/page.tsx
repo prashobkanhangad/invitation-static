@@ -12,9 +12,9 @@ import {
 } from "./components";
 
 export const metadata: Metadata = {
-  title: "Surya & Subrahmanyan | Modern Wedding Invitation",
+  title: "Surya & Subrahmanyan | Invyto Wedding Invitation",
   description:
-    "Celebrate the sacred union of ChI. Sou. Surya Gayathri M and ChI. Subrahmanyan Namboodiri P. Explore family details, schedule, and invitation.",
+    "Celebrate the sacred union of Surya Gayathri M and Subrahmanyan Namboodiri P. Explore family details, schedule, and invitation.",
   keywords: [
     "Surya and Subrahmanyan wedding",
     "modern wedding invite",
@@ -31,7 +31,7 @@ export const metadata: Metadata = {
     siteName: "Invyto",
     images: [
       {
-        url: "/modern/og-cover.jpg",
+        url: "/modern/og-cover.png",
         width: 1200,
         height: 630,
         alt: "Surya & Subrahmanyan Wedding Portrait",
@@ -50,7 +50,7 @@ export const metadata: Metadata = {
     card: "summary_large_image",
     title: "Surya & Subrahmanyan | Modern Wedding Invitation",
     description: "Save the dates and celebrate with Surya and Subrahmanyan.",
-    images: ["/modern/og-cover.jpg"],
+    images: ["/modern/og-cover.png"],
     creator: "@invyto",
   },
 };
