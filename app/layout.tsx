@@ -3,7 +3,7 @@ import "./globals.css";
 
 export const metadata: Metadata = {
   metadataBase: new URL("https://www.invyto.in"),
-  title: "InviteElegance - Beautiful Digital Invitations",
+  title: "Invyto – Elegant Digital Invitations",
   description:
     "Create stunning digital invitations for weddings, birthdays, and corporate events in minutes. Effortless, elegant, and eco-friendly.",
   keywords: [
@@ -17,7 +17,7 @@ export const metadata: Metadata = {
     canonical: "https://www.invyto.in",
   },
   openGraph: {
-    title: "InviteElegance - Beautiful Digital Invitations",
+    title: "Invyto – Elegant Digital Invitations",
     description:
       "Create stunning digital invitations for weddings, birthdays, and corporate events in minutes. Effortless, elegant, and eco-friendly.",
     url: "https://www.invyto.in",
@@ -34,7 +34,7 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: "summary_large_image",
-    title: "InviteElegance - Beautiful Digital Invitations",
+    title: "Invyto – Elegant Digital Invitations",
     description:
       "Create stunning digital invitations for weddings, birthdays, and corporate events in minutes. Effortless, elegant, and eco-friendly.",
     images: [`/Invyto/og-cover.png`],
