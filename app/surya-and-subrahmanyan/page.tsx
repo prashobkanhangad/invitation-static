@@ -22,11 +22,19 @@ export const metadata: Metadata = {
     "digital wedding invitation",
     "Payyannur wedding",
   ],
+  authors: [{ name: "Surya & Subrahmanyan" }],
+  creator: "Invyto",
+  publisher: "Invyto",
+  formatDetection: {
+    email: false,
+    address: false,
+    telephone: false,
+  },
   alternates: {
     canonical: "https://www.invyto.in/surya-and-subrahmanyan",
   },
   openGraph: {
-    title: "Surya & Subrahmanyan | Modern Wedding Invitation",
+    title: "Surya & Subrahmanyan | Invyto Wedding Invitation",
     description: "Join us in celebrating a heartfelt union in Payyannur filled with tradition, memories, and love.",
     url: "https://www.invyto.in/surya-and-subrahmanyan",
     siteName: "Invyto",
@@ -43,11 +51,24 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: "summary_large_image",
-    title: "Surya & Subrahmanyan | Modern Wedding Invitation",
+    title: "Surya & Subrahmanyan | Invyto Wedding Invitation",
     description: "Save the dates and celebrate with Surya and Subrahmanyan.",
     images: [`/Invyto/og-cover.png`],
     creator: "@invyto",
   },
+  robots: {
+    index: true,
+    follow: true,
+    nocache: false,
+    googleBot: {
+      index: true,
+      follow: true,
+      "max-video-preview": -1,
+      "max-image-preview": "large",
+      "max-snippet": -1,
+    },
+  },
+  category: "wedding",
 };
 
 export default function ModernWeddingPage() {
