@@ -12,6 +12,7 @@ import {
 } from "./components";
 
 export const metadata: Metadata = {
+  metadataBase: new URL("https://www.invyto.in"),
   title: "Surya & Subrahmanyan | Invyto Wedding Invitation",
   description:
     "Celebrate the sacred union of Surya Gayathri M and Subrahmanyan Namboodiri P. Explore family details, schedule, and invitation.",
@@ -22,16 +23,16 @@ export const metadata: Metadata = {
     "Payyannur wedding",
   ],
   alternates: {
-    canonical: "https://www.invyto.in/modern-wedding",
+    canonical: "https://www.invyto.in/surya-and-subrahmanyan",
   },
   openGraph: {
     title: "Surya & Subrahmanyan | Modern Wedding Invitation",
     description: "Join us in celebrating a heartfelt union in Payyannur filled with tradition, memories, and love.",
-    url: "https://www.invyto.in/modern-wedding",
+    url: "https://www.invyto.in/surya-and-subrahmanyan",
     siteName: "Invyto",
     images: [
       {
-        url: "/modern/og-cover.png",
+        url: "https://www.invyto.in/modern/og-cover.png",
         width: 1200,
         height: 630,
         alt: "Surya & Subrahmanyan Wedding Portrait",
@@ -44,7 +45,7 @@ export const metadata: Metadata = {
     card: "summary_large_image",
     title: "Surya & Subrahmanyan | Modern Wedding Invitation",
     description: "Save the dates and celebrate with Surya and Subrahmanyan.",
-    images: ["/modern/og-cover.png"],
+    images: ["https://www.invyto.in/modern/og-cover.png"],
     creator: "@invyto",
   },
 };
