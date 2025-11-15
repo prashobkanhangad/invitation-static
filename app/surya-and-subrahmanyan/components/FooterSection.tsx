@@ -1,4 +1,4 @@
-const footerImage = "/modern/WhatsApp Image 2025-11-15 at 22.34.16.jpeg";
+const footerImage = "/modern/footer.jpg";
 
 export const FooterSection = () => {
   return (
