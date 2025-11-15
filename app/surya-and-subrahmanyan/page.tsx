@@ -32,7 +32,7 @@ export const metadata: Metadata = {
     siteName: "Invyto",
     images: [
       {
-        url: "https://www.invyto.in/modern/og-cover.png",
+        url: `/modern/og-cover.png`,
         width: 1200,
         height: 630,
         alt: "Surya & Subrahmanyan Wedding Portrait",
@@ -45,7 +45,7 @@ export const metadata: Metadata = {
     card: "summary_large_image",
     title: "Surya & Subrahmanyan | Modern Wedding Invitation",
     description: "Save the dates and celebrate with Surya and Subrahmanyan.",
-    images: ["https://www.invyto.in/modern/og-cover.png"],
+    images: [`/modern/og-cover.png`],
     creator: "@invyto",
   },
 };
