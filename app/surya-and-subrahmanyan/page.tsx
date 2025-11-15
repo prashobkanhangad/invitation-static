@@ -18,7 +18,7 @@ export const metadata: Metadata = {
     "Celebrate the sacred union of Surya Gayathri M and Subrahmanyan Namboodiri P. Explore family details, schedule, and invitation.",
   keywords: [
     "Surya and Subrahmanyan wedding",
-    "Invyto wedding invite",
+    "modern wedding invite",
     "digital wedding invitation",
     "Payyannur wedding",
   ],
@@ -26,13 +26,13 @@ export const metadata: Metadata = {
     canonical: "https://www.invyto.in/surya-and-subrahmanyan",
   },
   openGraph: {
-    title: "Surya & Subrahmanyan | Invyto Wedding Invitation",
+    title: "Surya & Subrahmanyan | Modern Wedding Invitation",
     description: "Join us in celebrating a heartfelt union in Payyannur filled with tradition, memories, and love.",
     url: "https://www.invyto.in/surya-and-subrahmanyan",
     siteName: "Invyto",
     images: [
       {
-        url: `/Invyto/og-image.png`,
+        url: `/Invyto/og-cover.png`,
         width: 1200,
         height: 630,
         alt: "Surya & Subrahmanyan Wedding Portrait",
@@ -43,14 +43,14 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: "summary_large_image",
-    title: "Surya & Subrahmanyan | Invyto Wedding Invitation",
+    title: "Surya & Subrahmanyan | Modern Wedding Invitation",
     description: "Save the dates and celebrate with Surya and Subrahmanyan.",
-    images: [`/Invyto/og-image.png`],
+    images: [`/Invyto/og-cover.png`],
     creator: "@invyto",
   },
 };
 
-export default function InvytoWeddingPage() {
+export default function ModernWeddingPage() {
   return (
     <div className="min-h-screen bg-background">
       <HeroSection />
