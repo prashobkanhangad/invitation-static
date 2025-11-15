@@ -1,7 +1,7 @@
 import { Quote } from "lucide-react";
 
 const floralDivider = "/modern/floral-divider.svg";
-const togetherImage = "/modern/WhatsApp Image 2025-11-15 at 23.11.16.jpeg";
+const togetherImage = "/modern/together.jpg";
 
 export const StorySection = () => {
   return (
