@@ -1,7 +1,7 @@
 const questions = [
   {
     q: "Who are the proud families blessing this union?",
-    a: "Surya is the beloved granddaughter of Late. Upendran Kundlayar & Late. Devaki Antherjanam and Late. Krishnan Namboodiri & Late. Suvarni Antherjanam.",
+    a: "Surya Gayathri M is from Makkaromkkottilam, Varakkad, Kasargod — daughter of Sri. Surya Narayanan M and Smt. Sathi VP, and sister of Surya Thejus.",
   },
   {
     q: "Tell us about the groom's home.",

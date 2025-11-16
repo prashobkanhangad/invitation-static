@@ -17,8 +17,7 @@ export const StorySection = () => {
           <div className="bg-card p-8 md:p-10 rounded-2xl shadow-lg animate-fade-in-up border border-border/50">
             <Quote className="w-8 h-8 text-primary mb-4" />
             <p className="text-foreground/90 text-lg md:text-xl leading-relaxed italic mb-4">
-              "From temple courtyards to long conversations, our story felt calm and inevitable. What began as blessings from our
-              elders soon became a promise we both wanted to keep forever."
+              "Same city. Same Mangalore. Yet strangers… until a blind date at Top House. Me checking his picture, looking up at every boy walking in — and then he arrived. And that day, as we walked through the streets of Mangalore, our story truly began. 💫❤️"
             </p>
             <p className="text-primary font-medium text-right">— Surya Gayathri</p>
           </div>
@@ -26,8 +25,7 @@ export const StorySection = () => {
           <div className="bg-card p-8 md:p-10 rounded-2xl shadow-lg animate-fade-in-up border border-border/50">
             <Quote className="w-8 h-8 text-primary mb-4" />
             <p className="text-foreground/90 text-lg md:text-xl leading-relaxed italic mb-4">
-              "Every conversation with Surya Gayathrifelt like returning home. With each family ritual and every shared dream, I knew
-              Payyannur would soon witness a union blessed by all those who came before us."
+            I remember scanning the place, wondering who she might be… and then I saw her — sitting there, checking her phone, a little nervous but beautifully calm...It felt like the beginning of something I didn’t even know I was waiting for. 💫❤️"
             </p>
             <p className="text-primary font-medium text-right">— Subrahmanyan</p>
           </div>
