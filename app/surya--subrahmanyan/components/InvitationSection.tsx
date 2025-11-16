@@ -18,7 +18,7 @@ export const InvitationSection = () => {
 
         <div className="mt-12 flex items-center justify-center gap-2">
           <Heart className="w-6 h-6 text-primary fill-primary animate-pulse" />
-          <p className="text-2xl md:text-3xl font-serif text-primary">Surya & Subrahmanyan</p>
+          <p className="text-2xl md:text-3xl font-serif text-primary">Surya Gayathri & Subrahmanyan</p>
           <Heart className="w-6 h-6 text-primary fill-primary animate-pulse" />
         </div>
 

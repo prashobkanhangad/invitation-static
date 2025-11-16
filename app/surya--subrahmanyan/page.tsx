@@ -13,16 +13,16 @@ import {
 
 export const metadata: Metadata = {
   metadataBase: new URL("https://www.invyto.in"),
-  title: "Surya & Subrahmanyan | Invyto Wedding Invitation",
+  title: "Surya Gayathri & Subrahmanyan | Invyto Wedding Invitation",
   description:
     "Celebrate the sacred union of Surya Gayathri M and Subrahmanyan Namboodiri P. Explore family details, schedule, and invitation.",
   keywords: [
-    "Surya and Subrahmanyan wedding",
+    "Surya Gayathri and Subrahmanyan wedding",
     "modern wedding invite",
     "digital wedding invitation",
     "Payyannur wedding",
   ],
-  authors: [{ name: "Surya & Subrahmanyan" }],
+  authors: [{ name: "Surya Gayathri & Subrahmanyan" }],
   creator: "Invyto",
   publisher: "Invyto",
   formatDetection: {
@@ -34,7 +34,7 @@ export const metadata: Metadata = {
     canonical: "https://www.invyto.in/surya-and-subrahmanyan",
   },
   openGraph: {
-    title: "Surya & Subrahmanyan | Invyto Wedding Invitation",
+    title: "Surya Gayathri & Subrahmanyan | Invyto Wedding Invitation",
     description: "Join us in celebrating a heartfelt union in Payyannur filled with tradition, memories, and love.",
     url: "https://www.invyto.in/surya-and-subrahmanyan",
     siteName: "Invyto",
@@ -43,7 +43,7 @@ export const metadata: Metadata = {
         url: `/Invyto/og-cover.png`,
         width: 1200,
         height: 630,
-        alt: "Surya & Subrahmanyan Wedding Portrait",
+        alt: "Surya Gayathri & Subrahmanyan Wedding Portrait",
       },
     ],
     locale: "en_US",
@@ -51,8 +51,8 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: "summary_large_image",
-    title: "Surya & Subrahmanyan | Invyto Wedding Invitation",
-    description: "Save the dates and celebrate with Surya and Subrahmanyan.",
+    title: "Surya Gayathri & Subrahmanyan | Invyto Wedding Invitation",
+    description: "Save the dates and celebrate with Surya Gayathri and Subrahmanyan.",
     images: [`/Invyto/og-cover.png`],
     creator: "@invyto",
   },

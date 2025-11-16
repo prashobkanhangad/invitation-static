@@ -4,7 +4,7 @@ export const FooterSection = () => {
   return (
     <footer className="mt-16">
       <div className="relative w-full overflow-hidden">
-        <img src={footerImage} alt="Surya & Subrahmanyan" className="h-[320px] w-full object-cover md:h-[480px]" />
+        <img src={footerImage} alt="Surya Gayathri & Subrahmanyan" className="h-[320px] w-full object-cover md:h-[480px]" />
       </div>
       <div className="bg-[#f9f4ef] text-[#4a3a2c] border-t border-[#b58c6b]/30">
         <div className="mx-auto flex max-w-5xl flex-col gap-3 px-4 py-6 text-center text-sm uppercase tracking-[0.35em] md:flex-row md:items-center md:justify-between md:text-base">
