@@ -28,7 +28,7 @@ export const metadata: Metadata = {
     siteName: "InviteElegance Wedding Invitations",
     images: [
       {
-        url: "/romanticpage/hero-couple.jpg",
+        url: "/Invyto/og-cover.png",
         width: 1200,
         height: 630,
         alt: "Sarah & James Wedding Photo",
@@ -47,7 +47,7 @@ export const metadata: Metadata = {
     card: "summary_large_image",
     title: "Sarah & James Wedding - June 15, 2025",
     description: "Join us for our wedding celebration in Tuscany, Italy",
-    images: ["/romanticpage/hero-couple.jpg"],
+    images: ["/Invyto/og-cover.png"],
     creator: "@inviteelegance",
   },
   robots: {
