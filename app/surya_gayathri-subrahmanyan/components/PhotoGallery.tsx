@@ -9,7 +9,7 @@ const photos = [
   { src: "/modern/gallery-1.jpg", alt: "Couple in garden" },
   { src: "/modern/gallery-2.jpg", alt: "Golden hour portrait" },
   { src: "/modern/gallery-3.jpg", alt: "Candid laughter" },
-  { src: "/modern/gallery-4.jpg", alt: "Sunset silhouette" },
+  { src: "/modern/WhatsApp Image 2025-11-15 at 22.34.14.jpeg", alt: "Sunset silhouette" },
   { src: "/modern/gallery-5.jpg", alt: "Traditional ceremony" },
   { src: "/modern/gallery-6.jpg", alt: "Modern casual shoot" },
   { src: "/modern/gallery-7.jpg", alt: "Intimate moment" },
