@@ -9,7 +9,7 @@ import {
   MapSection,
   InvitationSection,
   FooterSection,
-} from "./components";
+}  from "./components";
 
 export const metadata: Metadata = {
   metadataBase: new URL("https://www.invyto.in"),
