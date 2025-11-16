@@ -9,7 +9,7 @@ export const StorySection = () => {
       <div className="max-w-4xl mx-auto">
         <div className="text-center mb-12 animate-fade-in-up">
           <p className="text-primary text-lg md:text-xl mb-2">Rooted in tradition, woven with destiny.</p>
-          <h2 className="text-4xl md:text-5xl font-serif text-foreground">Surya & Subrahmanyan</h2>
+          <h2 className="text-4xl md:text-5xl font-serif text-foreground">Surya Gayathri & Subrahmanyan</h2>
           <img src={floralDivider} alt="" className="w-16 h-16 mx-auto mt-6 opacity-60" />
         </div>
 
@@ -44,7 +44,7 @@ export const StorySection = () => {
           <div className="relative h-[60vh] w-full md:h-[75vh] lg:h-[90vh]">
             <img
               src={togetherImage}
-              alt="Surya & Subrahmanyan together"
+              alt="Surya Gayathri & Subrahmanyan together"
               className="h-full w-full object-cover transition-transform duration-[4000ms] ease-out hover:scale-105"
             />
             <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-black/10" />

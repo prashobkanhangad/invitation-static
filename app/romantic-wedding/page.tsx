@@ -4,10 +4,6 @@ import Quote from "./components/Quote";
 import VenueMap from "./components/VenueMap";
 import Gallery from "./components/Gallery";
 import RSVP from "./components/RSVP";
-// import Gallery from "./components/Gallery";
-// import Quote from "./components/Quote";
-// import VenueMap from "./components/VenueMap";
-// import RSVP from "./components/RSVP";
 
 export const metadata: Metadata = {
   title: "Sarah & James Wedding - June 15, 2025 | Tuscany, Italy",

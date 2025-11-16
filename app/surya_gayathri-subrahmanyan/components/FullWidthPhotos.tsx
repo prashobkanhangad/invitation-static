@@ -4,7 +4,7 @@ const brideImage = "/modern/bride-portrait.jpg";
 export const FullWidthPhotos = () => {
   const slides = [
     { src: groomImage, label: "Subrahmanyan" },
-    { src: brideImage, label: "Surya", classes: "object-[50%_32%]" },
+    { src: brideImage, label: "Surya Gayathri", classes: "object-[50%_32%]" },
   ];
 
   return (
