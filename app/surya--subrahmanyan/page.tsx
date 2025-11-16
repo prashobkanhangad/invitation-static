@@ -40,7 +40,7 @@ export const metadata: Metadata = {
     siteName: "Invyto",
     images: [
       {
-        url: `/Invyto/og-cover.png`,
+        url: "https://www.invyto.in/Invyto/og-cover.png",
         width: 1200,
         height: 630,
         alt: "Surya Gayathri & Subrahmanyan Wedding Portrait",
@@ -53,7 +53,7 @@ export const metadata: Metadata = {
     card: "summary_large_image",
     title: "Surya Gayathri & Subrahmanyan | Invyto Wedding Invitation",
     description: "Save the dates and celebrate with Surya Gayathri and Subrahmanyan.",
-    images: [`/Invyto/og-cover.png`],
+    images: ["https://www.invyto.in/Invyto/og-cover.png"],
     creator: "@invyto",
   },
   robots: {
