@@ -31,12 +31,12 @@ export const metadata: Metadata = {
     telephone: false,
   },
   alternates: {
-    canonical: "https://www.invyto.in/surya-and-subrahmanyan",
+    canonical: "https://www.invyto.in/surya--subrahmanyan",
   },
   openGraph: {
     title: "Surya Gayathri & Subrahmanyan | Invyto Wedding Invitation",
     description: "Join us in celebrating a heartfelt union in Payyannur filled with tradition, memories, and love.",
-    url: "https://www.invyto.in/surya-and-subrahmanyan",
+    url: "https://www.invyto.in/surya--subrahmanyan",
     siteName: "Invyto",
     images: [
       {
