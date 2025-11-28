@@ -40,11 +40,11 @@ export const metadata: Metadata = {
     siteName: "Invyto",
     images: [
       {
-        url: "https://www.invyto.in/jithendra-naditha/jithendra_og.png?v=1",
+        url: "https://www.invyto.in/jithendra-naditha/jithendra_og.jpg",
         width: 1200,
         height: 630,
         alt: "Jithendra & Nanditha Wedding Portrait",
-        type: "image/png",
+        type: "image/jpeg",
       },
     ],
     locale: "en_US",
@@ -54,7 +54,7 @@ export const metadata: Metadata = {
     card: "summary_large_image",
     title: "Jithendra & Nanditha | Invyto Wedding Invitation",
     description: "Save the dates and celebrate with Jithendra and Nanditha.",
-    images: ["https://www.invyto.in/jithendra-naditha/jithendra_og.png?v=1"],
+    images: ["https://www.invyto.in/jithendra-naditha/jithendra_og.jpg"],
     creator: "@invyto",
   },
   robots: {
