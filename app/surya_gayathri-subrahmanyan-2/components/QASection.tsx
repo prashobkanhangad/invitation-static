@@ -9,7 +9,7 @@ const questions = [
   },
   {
     q: "Tell us about the groom.",
-    a: "Sanath is the Grandson of Late KPV Raman & Late PV Savitiri and Late MV Karunakaran & MV Nanyayui.",
+    a: "Sanath is the Grandson of Late KPV Raman & Late PV Savitiri and Late MV Karunakaran & MV Narayani.",
   },
   {
     q: "Tell us about the bride.",
