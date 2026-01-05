@@ -40,7 +40,7 @@ export const metadata: Metadata = {
         siteName: "Invyto",
         images: [
           {
-            url: "https://www.invyto.in/adarsh/img-18.jpeg",
+            url: "https://www.invyto.in/adarsh/ogimage.jpg?v=1",
             width: 1200,
             height: 630,
             alt: "Anupriya & Adarsh Wedding Portrait",
@@ -54,7 +54,7 @@ export const metadata: Metadata = {
         card: "summary_large_image",
         title: "Anupriya & Adarsh | Invyto Wedding Invitation",
         description: "Save the dates and celebrate with Anupriya and Adarsh.",
-        images: ["https://www.invyto.in/adarsh/img-18.jpeg"],
+        images: ["https://www.invyto.in/adarsh/ogimage.jpg?v=1"],
         creator: "@invyto",
       },
   robots: {

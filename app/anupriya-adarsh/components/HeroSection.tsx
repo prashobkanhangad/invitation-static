@@ -6,8 +6,8 @@ import { MapPin } from "lucide-react";
 const heroImage = "/adarsh/img-12.jpeg";
 
 const rotatingTexts = [
-  { prefix: "Namaskaram", main: "I'm Anupriya" },
-  { prefix: "and I am", main: "Adarsh" },
+  { prefix: "Namaskaram", main: "I'm Adarsh" },
+  { prefix: "and I am", main: "Anupriya" },
   { prefix: "We're tying the knot", main: "10 · 01 · 2026" },
 ];
 

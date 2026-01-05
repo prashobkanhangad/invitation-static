@@ -1,7 +1,7 @@
 const questions = [
   {
     q: "Who are the bride's parents?",
-    a: "K. V. Suresh Babu & Sumana Suresh from 'Anugraha', Kovval Pally, Kanhangad P.O., Kasaragod District - 671 315. ",
+    a: "K. V. Suresh Babu & Sumana Suresh from 'Anugraha', Kovval Pally, Kanhangad P.O., Kasaragod District - 671 315.",
   },
   {
     q: "Tell us about the groom's parents.",
