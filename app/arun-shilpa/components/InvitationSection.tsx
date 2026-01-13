@@ -26,7 +26,7 @@ export const InvitationSection = () => {
 
         <div className="mt-6 sm:mt-8 space-y-2 sm:space-y-3 px-4">
           <p className="text-[#6B4423] text-xs sm:text-sm md:text-base font-semibold">
-            With Best Compliments From: <span className="text-[#7A0F0F] font-bold">Ashwin, Medha & Dhyan</span>
+            With Best Compliments From: <span className="text-[#7A0F0F] font-bold">Ashwin, Medha, Dhyan, Kavita & Noyal</span>
           </p>
           <p className="text-[#8B1A1A] text-xs sm:text-sm md:text-base italic max-w-xl mx-auto">
             "Your gracious presence and blessings will add joy to this special occasion as we unite the two hearts."
