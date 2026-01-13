@@ -50,7 +50,7 @@ export const ImageCarousel = () => {
           >
             {carouselImages.map((image, index) => (
               <div key={index} className="min-w-full h-[50vh] sm:h-[60vh] md:h-[70vh] relative">
-                <div className="absolute inset-0 overlay-warm z-[1] opacity-40"></div>
+                {/* <div className="absolute inset-0 overlay-warm z-[1] opacity-40"></div> */}
                 <img
                   src={image.src}
                   alt={image.alt}

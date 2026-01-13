@@ -43,7 +43,7 @@ export const PhotoGallery = () => {
               style={{ animationDelay: `${index * 0.05}s` }}
               onClick={() => setSelectedImage(photo.src)}
             >
-              <div className="absolute inset-0 overlay-warm opacity-0 group-hover:opacity-40 transition-opacity duration-300 z-[1]"></div>
+              <div className="absolute inset-0 opacity-0 group-hover:opacity-40 transition-opacity duration-300 z-[1]"></div>
               <img
                 src={photo.src}
                 alt={photo.alt}

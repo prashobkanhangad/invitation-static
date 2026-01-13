@@ -55,7 +55,7 @@ export const StorySection = () => {
         </div>
 
         <div className="mt-8 sm:mt-10 overflow-hidden rounded-2xl sm:rounded-3xl shadow-2xl animate-fade-in-up relative">
-          <div className="absolute inset-0 overlay-warm z-[1] opacity-60"></div>
+          {/* <div className="absolute inset-0 overlay-warm z-[1] opacity-60"></div> */}
           <div className="relative h-[50vh] sm:h-[60vh] md:h-[75vh] lg:h-[90vh] w-full z-0">
             <img
               src={togetherImage}
