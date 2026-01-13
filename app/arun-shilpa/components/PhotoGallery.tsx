@@ -7,7 +7,7 @@ const photos = [
   { src: "/arun-shilpa/img-1.jpeg", alt: "Wedding celebration" },
   { src: "/arun-shilpa/img-2.jpeg", alt: "Wedding moment" },
   { src: "/arun-shilpa/img-3.jpeg", alt: "Beautiful memory" },
-  { src: "/arun-shilpa/img-4.jpeg", alt: "Special occasion" },
+  { src: "/arun-shilpa/img-14.jpeg", alt: "Special occasion" },
   { src: "/arun-shilpa/img-5.jpeg", alt: "Cherished moment" },
   { src: "/arun-shilpa/img-6.jpeg", alt: "Celebration" },
   { src: "/arun-shilpa/img-7.jpeg", alt: "Joyful memory" },

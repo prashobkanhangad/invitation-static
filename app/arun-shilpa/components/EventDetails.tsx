@@ -58,7 +58,7 @@ export const EventDetails = () => {
           <p className="text-[#6B4423] text-base sm:text-lg font-medium">We love to see you soon</p>
         </div>
 
-        <div className="grid sm:grid-cols-2 gap-4 sm:gap-6 md:gap-8 mb-10 sm:mb-12 md:mb-16">
+        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6 md:gap-8 mb-10 sm:mb-12 md:mb-16">
           <div className="p-6 sm:p-8 md:p-10 text-center space-y-3 sm:space-y-4 shadow-xl border border-[#B8945F]/40 rounded-2xl sm:rounded-3xl bg-silk-texture animate-fade-in-up hover:shadow-2xl transition-all duration-300 hover:scale-[1.02] relative overflow-hidden">
             <div className="absolute top-0 right-0 w-24 h-24 opacity-5" style={{
               backgroundImage: `url("data:image/svg+xml,%3Csvg width='40' height='40' viewBox='0 0 40 40' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='%237A0F0F' fill-opacity='1'%3E%3Cpath d='M20 20.5V18H0v-2h20v-2H0v-2h20v-2H0V8h20V6H0V4h20V2H0V0h22v20h-2zm-2 0v2H0v-2h18zm0 4v2H0v-2h18zm0 4v2H0v-2h18z'/%3E%3C/g%3E%3C/svg%3E")`
@@ -80,6 +80,42 @@ export const EventDetails = () => {
               <div className="flex items-center justify-center gap-2 text-[#6B4423] text-sm sm:text-base">
                 <Clock className="w-4 h-4 sm:w-5 sm:h-5 flex-shrink-0 text-[#7A0F0F]" />
                 <span>Time: 10:00 AM</span>
+              </div>
+            </div>
+          </div>
+
+          <div className="p-6 sm:p-8 md:p-10 text-center space-y-3 sm:space-y-4 shadow-xl border border-[#B8945F]/40 rounded-2xl sm:rounded-3xl bg-silk-texture animate-fade-in-up hover:shadow-2xl transition-all duration-300 hover:scale-[1.02] relative overflow-hidden">
+            <div className="absolute top-0 right-0 w-24 h-24 opacity-5" style={{
+              backgroundImage: `url("data:image/svg+xml,%3Csvg width='40' height='40' viewBox='0 0 40 40' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='%237A0F0F' fill-opacity='1'%3E%3Cpath d='M20 20.5V18H0v-2h20v-2H0v-2h20v-2H0V8h20V6H0V4h20V2H0V0h22v20h-2zm-2 0v2H0v-2h18zm0 4v2H0v-2h18zm0 4v2H0v-2h18z'/%3E%3C/g%3E%3C/svg%3E")`
+            }}></div>
+            <div className="w-14 h-14 sm:w-16 sm:h-16 mx-auto bg-gradient-to-br from-[#7A0F0F] to-[#8B1A1A] rounded-full flex items-center justify-center mb-2 shadow-lg relative z-10">
+              <Calendar className="w-7 h-7 sm:w-8 sm:h-8 md:w-12 md:h-12 text-[#FFF8DC]" />
+            </div>
+            <h3 className="text-xl sm:text-2xl md:text-3xl font-serif text-[#7A0F0F] font-semibold relative z-10">Wedding Reception</h3>
+            <div className="space-y-1 sm:space-y-2 relative z-10">
+              <p className="text-3xl sm:text-4xl font-serif text-[#B87333] font-bold drop-shadow-sm">22</p>
+              <p className="text-lg sm:text-xl text-[#7A0F0F] font-medium">January 2026</p>
+              <p className="text-base sm:text-lg text-[#6B4423]">Thursday</p>
+            </div>
+            <div className="pt-3 sm:pt-4 space-y-2 border-t border-[#7A0F0F]/30 mt-4 sm:mt-6 relative z-10">
+              <div className="flex items-center justify-center gap-2 text-[#6B4423] text-sm sm:text-base">
+                <MapPin className="w-4 h-4 sm:w-5 sm:h-5 flex-shrink-0 text-[#7A0F0F]" />
+                <span className="leading-tight">Hina Convention Centre, Karimpuzha, Sreekrishnapuram, Palakkad</span>
+              </div>
+              <div className="flex items-center justify-center gap-2 text-[#6B4423] text-sm sm:text-base">
+                <Clock className="w-4 h-4 sm:w-5 sm:h-5 flex-shrink-0 text-[#7A0F0F]" />
+                <span>Time: 4:30 PM – 8:30 PM</span>
+              </div>
+              <div className="pt-2">
+                <a
+                  href="https://share.google/qi0lZIQEn4NuVyrHc"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center justify-center gap-2 rounded-full bg-gradient-to-r from-[#7A0F0F] via-[#A01D2E] to-[#7A0F0F] px-4 sm:px-6 py-2 sm:py-2.5 text-xs sm:text-sm font-semibold text-[#FFF8DC] shadow-lg hover:shadow-xl transition-all duration-300 hover:from-[#A01D2E] hover:via-[#C41E3A] hover:to-[#A01D2E] hover:scale-105 border border-[#B8945F]/40"
+                >
+                  <MapPin className="w-3 h-3 sm:w-4 sm:h-4" />
+                  <span>Open in Google Maps</span>
+                </a>
               </div>
             </div>
           </div>
