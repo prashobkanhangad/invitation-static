@@ -9,7 +9,7 @@ const questions = [
   },
   {
     q: "Tell us about the bride.",
-    a: "Shilpa.B.M, Granddaughter of (Late) K.M.Kumaran & P.M.Chandravati Amma, and (Late) Shankaran Gurikkal & Sarojini Amma",
+    a: "Shilpa.P.M, Granddaughter of (Late) K.M.Kumaran & P.M.Chandravati Amma, and (Late) Shankaran Gurikkal & Sarojini Amma",
   },
   {
     q: "Tell us about the groom.",
