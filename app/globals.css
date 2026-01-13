@@ -3,15 +3,24 @@
 @tailwind utilities;
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #ffffff;
-    --foreground: #171717;
-  }
+  --background: #FDF6E3;
+  --foreground: #6B4423;
+  /* Warm Indian Wedding Palette */
+  --maroon-deep: #7A0F0F;
+  --maroon-medium: #8B1A1A;
+  --red-bridal: #A01D2E;
+  --red-vibrant: #C41E3A;
+  --sienna-burnt: #C85A3A;
+  --sienna-warm: #E97451;
+  --terracotta: #B87333;
+  --terracotta-light: #CD853F;
+  --brown-warm: #6B4423;
+  --brown-medium: #8B4513;
+  --gold-muted: #B8945F;
+  --gold-soft: #C9A961;
+  --ivory: #FFF8DC;
+  --parchment: #F5E6D3;
+  --cream: #FDF6E3;
 }
 
 * {
@@ -29,6 +38,30 @@ body {
   background: var(--background);
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
   line-height: 1.6;
+  position: relative;
+}
+
+/* Texture overlay for vintage feel */
+body::before {
+  content: '';
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-image: 
+    radial-gradient(circle at 20% 50%, rgba(139, 26, 26, 0.03) 0%, transparent 50%),
+    radial-gradient(circle at 80% 80%, rgba(184, 83, 33, 0.03) 0%, transparent 50%),
+    repeating-linear-gradient(
+      0deg,
+      transparent,
+      transparent 2px,
+      rgba(107, 68, 35, 0.01) 2px,
+      rgba(107, 68, 35, 0.01) 4px
+    );
+  pointer-events: none;
+  z-index: 1;
+  opacity: 0.4;
 }
 
 @layer utilities {
@@ -50,5 +83,65 @@ body {
   
   .animate-fade-in-up {
     animation: fade-in-up 1s ease-out;
+  }
+  
+  @keyframes zoom {
+    0%, 100% {
+      transform: scale(1.1);
+    }
+    50% {
+      transform: scale(1.15);
+    }
+  }
+  
+  .animate-zoom {
+    animation: zoom 15s ease-in-out infinite;
+  }
+  
+  /* Vintage texture backgrounds */
+  .bg-fabric-texture {
+    background-image: 
+      repeating-linear-gradient(
+        45deg,
+        transparent,
+        transparent 10px,
+        rgba(139, 26, 26, 0.02) 10px,
+        rgba(139, 26, 26, 0.02) 20px
+      ),
+      repeating-linear-gradient(
+        -45deg,
+        transparent,
+        transparent 10px,
+        rgba(184, 83, 33, 0.02) 10px,
+        rgba(184, 83, 33, 0.02) 20px
+      );
+  }
+  
+  .bg-silk-texture {
+    background: linear-gradient(
+      135deg,
+      rgba(253, 246, 227, 0.8) 0%,
+      rgba(245, 230, 211, 0.9) 50%,
+      rgba(255, 248, 220, 0.8) 100%
+    );
+  }
+  
+  /* Cinematic overlay gradients */
+  .overlay-vintage {
+    background: linear-gradient(
+      to bottom,
+      rgba(122, 15, 15, 0.4) 0%,
+      rgba(107, 68, 35, 0.3) 50%,
+      rgba(0, 0, 0, 0.6) 100%
+    );
+  }
+  
+  .overlay-warm {
+    background: linear-gradient(
+      to bottom,
+      rgba(160, 29, 46, 0.2) 0%,
+      rgba(184, 83, 33, 0.3) 50%,
+      rgba(107, 68, 35, 0.5) 100%
+    );
   }
 }
