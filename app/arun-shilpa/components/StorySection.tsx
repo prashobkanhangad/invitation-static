@@ -29,7 +29,7 @@ export const StorySection = () => {
             }}></div>
             <Quote className="w-6 h-6 sm:w-8 sm:h-8 text-[#8B1A1A] mb-3 sm:mb-4 relative z-10" />
             <p className="text-[#6B4423] text-base sm:text-lg md:text-xl leading-relaxed italic mb-3 sm:mb-4 relative z-10">
-              "With immense joy and divine grace, we cordially request your esteemed presence with family on the auspicious occasion of the wedding reception of our daughter. Our journey together is a beautiful story of love, tradition, and family blessings. 💫❤️"
+              "With immense joy and divine grace, we cordially request your esteemed presence with family on the auspicious occasion of the wedding of our daughter. Our journey together is a beautiful story of love, tradition, and family blessings. 💫❤️"
             </p>
             <p className="text-[#7A0F0F] font-semibold text-right text-sm sm:text-base relative z-10">— Shilpa</p>
           </div>
