@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { MapPin } from "lucide-react";
 
-const heroImage = "/arun-shilpa/img-14.jpeg";
+const heroImage = "/arun-shilpa/img-4.jpeg";
 
 const rotatingTexts = [
   { prefix: "Namaskaram", main: "I'm Arun" },
@@ -25,7 +25,7 @@ export const HeroSection = () => {
   return (
     <section className="relative min-h-screen flex items-center justify-center overflow-hidden">
       {/* Vintage overlay with vignette */}
-      <div className="absolute inset-0 overlay-vintage z-[1]"></div>
+      {/* <div className="absolute inset-0 z-[1]"></div> */}
       
       <div className="absolute inset-0 z-0">
         <img 

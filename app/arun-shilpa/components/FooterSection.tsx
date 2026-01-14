@@ -6,7 +6,7 @@ export const FooterSection = () => {
       <div className="px-4 sm:px-6 py-8 sm:py-12 md:py-16 bg-fabric-texture relative">
         <div className="max-w-7xl mx-auto relative z-10">
           <div className="overflow-hidden rounded-2xl sm:rounded-3xl shadow-2xl animate-fade-in-up relative">
-            <div className="absolute inset-0 overlay-warm z-[1] opacity-50"></div>
+            {/* <div className="absolute inset-0 overlay-warm z-[1] opacity-50"></div> */}
             <div className="relative h-[50vh] sm:h-[55vh] md:h-[60vh] lg:h-[65vh] w-full z-0">
               <img
                 src={footerImage}

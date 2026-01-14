@@ -7,7 +7,7 @@ const photos = [
   { src: "/arun-shilpa/img-1.jpeg", alt: "Wedding celebration" },
   { src: "/arun-shilpa/img-2.jpeg", alt: "Wedding moment" },
   { src: "/arun-shilpa/img-3.jpeg", alt: "Beautiful memory" },
-  { src: "/arun-shilpa/img-4.jpeg", alt: "Special occasion" },
+  { src: "/arun-shilpa/img-14.jpeg", alt: "Special occasion" },
   { src: "/arun-shilpa/img-5.jpeg", alt: "Cherished moment" },
   { src: "/arun-shilpa/img-6.jpeg", alt: "Celebration" },
   { src: "/arun-shilpa/img-7.jpeg", alt: "Joyful memory" },
@@ -43,7 +43,7 @@ export const PhotoGallery = () => {
               style={{ animationDelay: `${index * 0.05}s` }}
               onClick={() => setSelectedImage(photo.src)}
             >
-              <div className="absolute inset-0 overlay-warm opacity-0 group-hover:opacity-40 transition-opacity duration-300 z-[1]"></div>
+              <div className="absolute inset-0 opacity-0 group-hover:opacity-40 transition-opacity duration-300 z-[1]"></div>
               <img
                 src={photo.src}
                 alt={photo.alt}
