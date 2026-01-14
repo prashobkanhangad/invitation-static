@@ -9,11 +9,11 @@ const questions = [
   },
   {
     q: "Tell us about the bride.",
-    a: "Shilpa.P.M, Granddaughter of (Late) K.M.Kumaran & P.M.Chandravati Amma, and (Late) Shankaran Gurikkal & Sarojini Amma",
+    a: "She is warmth personfied, pampered& cherished by family& friends. Finds her joy in books& favourite chilenga.",
   },
   {
     q: "Tell us about the groom.",
-    a: "Arun Krishnan, Son of U.Krishnan Kutty & K.Bindu",
+    a: "Brought up in Delhi by two Malayali hearts. He sees life through stories, stages and, his beloved camera",
   },
   {
     q: "When exactly will the marriage take place?",
@@ -21,6 +21,10 @@ const questions = [
   },
   {
     q: "When is the wedding reception?",
+    a: "On Thursday, 22nd January 2026 from 4:30 PM to 8:30 PM at Hina Convention Centre, Karimpuzha, Sreekrishnapuram, Palakkad",
+  },
+  {
+    q: "When is the other wedding reception?",
     a: "On Sunday, 25th January 2026 from 11:30 AM to 3:30 PM at Bekal Club & Resort, Kanhangad, Kasaragod",
   },
 ];
