@@ -23,7 +23,7 @@ export const PhotoGallery = () => {
   }, []);
 
   return (
-    <section className="py-12 sm:py-16 md:py-24 px-4 sm:px-6 bg-fabric-texture relative">
+    <section className="py-12 sm:py-16 md:py-24 px-3 sm:px-4 md:px-5 lg:px-6 bg-fabric-texture relative">
       <div className="max-w-7xl mx-auto relative z-10">
         <div className="text-center mb-8 sm:mb-10 md:mb-12 animate-fade-in-up">
           <div className="flex items-center justify-center gap-2 mb-4 sm:mb-6">
@@ -35,11 +35,11 @@ export const PhotoGallery = () => {
           <p className="text-[#6B4423] text-sm sm:text-base md:text-lg mt-2 sm:mt-4 font-medium">Capturing our beautiful moments together</p>
         </div>
 
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2 sm:gap-3 md:gap-4">
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4 md:gap-5 lg:gap-6">
           {photos.map((photo, index) => (
             <div
               key={photo.alt}
-              className="group relative overflow-hidden rounded-lg sm:rounded-xl shadow-lg border border-[#B8945F]/30 hover:border-[#B8945F]/60 cursor-pointer animate-fade-in-up aspect-square transition-all duration-500 hover:scale-105"
+              className="group relative overflow-hidden rounded-lg sm:rounded-xl shadow-lg cursor-pointer animate-fade-in-up aspect-[7/6] transition-all duration-500 hover:scale-105"
               style={{ animationDelay: `${index * 0.05}s` }}
               onClick={() => setSelectedImage(photo.src)}
             >
@@ -75,7 +75,7 @@ export const PhotoGallery = () => {
             <img 
               src={selectedImage} 
               alt="Gallery photo" 
-              className="max-h-[85vh] w-auto rounded-2xl object-contain shadow-2xl" 
+              className="max-h-[85vh] w-auto rounded-lg sm:rounded-xl object-contain shadow-2xl" 
               onClick={(e) => e.stopPropagation()}
             />
           </div>
