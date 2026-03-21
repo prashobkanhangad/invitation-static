@@ -21,7 +21,7 @@ const extraPhotos = [
     alt: "Sreejai Sreedeep & Shobana Rambe — memory (extra 1)",
   },
   {
-    src: `${BASE}/WhatsApp Image 2026-03-21 at 11.08.39.jpeg`,
+    src: `${BASE}/WhatsApp Image 2026-03-21 at 11.08.40.jpeg`,
     alt: "Sreejai Sreedeep & Shobana Rambe — memory (extra 2)",
   },
 ];
