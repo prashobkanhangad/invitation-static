@@ -18,7 +18,8 @@ export function AlbumGallery() {
   const downloadCurrent = useCallback(async () => {
     if (index === null) return;
     const src = albumPhotos[index].src;
-    const filename = `srideep-shobana-photo-${index + 1}.jpeg`;
+    const ext = src.split(".").pop()?.toLowerCase() ?? "jpeg";
+    const filename = `srideep-shobana-photo-${index + 1}.${ext}`;
     try {
       const res = await fetch(src);
       if (!res.ok) throw new Error("fetch failed");
