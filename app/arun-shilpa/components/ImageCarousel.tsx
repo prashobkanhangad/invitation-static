@@ -43,7 +43,7 @@ export const ImageCarousel = () => {
     <div className="mt-12 sm:mt-16 md:mt-20 animate-fade-in-up">
       <div className="relative max-w-5xl mx-auto">
         {/* Carousel Container */}
-        <div className="relative overflow-hidden rounded-2xl sm:rounded-3xl shadow-2xl border border-[#B8945F]/40">
+        <div className="relative overflow-hidden rounded-lg sm:rounded-xl shadow-2xl">
           <div
             className="flex transition-transform duration-500 ease-in-out"
             style={{ transform: `translateX(-${currentIndex * 100}%)` }}
