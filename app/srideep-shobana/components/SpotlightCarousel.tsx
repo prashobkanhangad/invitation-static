@@ -6,12 +6,11 @@ import { ChevronLeft, ChevronRight, X, Download } from "lucide-react";
 const BASE = "/srideep_shobana";
 
 const spotlightSlides = [
-  { src: `${BASE}/img-37.jpeg`, alt: "Sreejai Sreedeep & Shobana Rambe — featured moment 1", fileNum: 37 },
-  { src: `${BASE}/img-38.jpeg`, alt: "Sreejai Sreedeep & Shobana Rambe — featured moment 2", fileNum: 38 },
-  { src: `${BASE}/img-39.jpeg`, alt: "Sreejai Sreedeep & Shobana Rambe — featured moment 3", fileNum: 39 },
-  { src: `${BASE}/img-40.jpeg`, alt: "Sreejai Sreedeep & Shobana Rambe — featured moment 4", fileNum: 40 },
-  { src: `${BASE}/img-41.jpeg`, alt: "Sreejai Sreedeep & Shobana Rambe — featured moment 5", fileNum: 41 },
-  { src: `${BASE}/img-42.jpeg`, alt: "Sreejai Sreedeep & Shobana Rambe — featured moment 6", fileNum: 42 },
+  { src: `${BASE}/img-13.jpeg`, alt: "Sreejai Sreedeep & Shobana Rambe — featured moment 1", fileNum: 13 },
+  { src: `${BASE}/img-17.jpeg`, alt: "Sreejai Sreedeep & Shobana Rambe — featured moment 2", fileNum: 17 },
+  { src: `${BASE}/img-18.jpeg`, alt: "Sreejai Sreedeep & Shobana Rambe — featured moment 3", fileNum: 18 },
+  { src: `${BASE}/img-12.jpeg`, alt: "Sreejai Sreedeep & Shobana Rambe — featured moment 4", fileNum: 12 },
+  { src: `${BASE}/img-15.jpeg`, alt: "Sreejai Sreedeep & Shobana Rambe — featured moment 5", fileNum: 15 },
 ];
 
 export function SpotlightCarousel() {
@@ -152,9 +151,7 @@ export function SpotlightCarousel() {
                 </div>
               ))}
             </div>
-            <span className="absolute bottom-12 sm:bottom-14 left-1/2 -translate-x-1/2 z-[5] rounded-full bg-[#2c1810]/65 backdrop-blur-sm px-3 py-1 text-[10px] sm:text-xs text-[#f7f2e9] tracking-wide pointer-events-none">
-              Tap to open · full size &amp; download
-            </span>
+
           </button>
 
           <button
