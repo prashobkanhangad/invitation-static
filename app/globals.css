@@ -3,8 +3,20 @@
 @tailwind utilities;
 
 :root {
-  --background: #FDF6E3;
-  --foreground: #6B4423;
+  /* Semantic UI (landing + Tailwind): space-separated HSL for opacity modifiers */
+  --background: 48 80% 96%;
+  --foreground: 28 49% 28%;
+  --primary: 43 65% 42%;
+  --primary-foreground: 0 0% 100%;
+  --secondary: 25 45% 92%;
+  --secondary-foreground: 20 35% 18%;
+  --muted: 40 25% 94%;
+  --muted-foreground: 220 9% 46%;
+  --border: 35 18% 88%;
+  --card: 0 0% 100%;
+  --card-foreground: 240 10% 12%;
+  --gold-light: 45 72% 58%;
+  --blush: 350 42% 82%;
   /* Warm Indian Wedding Palette */
   --maroon-deep: #7A0F0F;
   --maroon-medium: #8B1A1A;
@@ -34,8 +46,8 @@ html {
 }
 
 body {
-  color: var(--foreground);
-  background: var(--background);
+  color: hsl(var(--foreground));
+  background: hsl(var(--background));
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
   line-height: 1.6;
   position: relative;
@@ -67,6 +79,24 @@ body::before {
 @layer utilities {
   .text-balance {
     text-wrap: balance;
+  }
+
+  .font-display {
+    font-family: Georgia, Cambria, "Times New Roman", Times, serif;
+  }
+
+  .font-body {
+    font-family: inherit;
+  }
+
+  .text-gradient-gold {
+    @apply bg-clip-text text-transparent;
+    background-image: linear-gradient(
+      120deg,
+      hsl(var(--primary)) 0%,
+      hsl(var(--gold-light)) 45%,
+      hsl(var(--primary)) 100%
+    );
   }
   
   /* Wedding Template Animations */
