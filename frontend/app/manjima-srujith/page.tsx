@@ -39,7 +39,7 @@ export const metadata: Metadata = {
         url: "https://www.invyto.in/manjima/Untitled%20design%20(62).png",
         width: 1200,
         height: 630,
-        alt: "Manjima & Srujith Wedding Invitation",
+        alt: "Manjima & Srujith Wedding  Invitation",
         type: "image/png",
       },
     ],
