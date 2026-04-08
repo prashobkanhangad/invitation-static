@@ -36,11 +36,11 @@ export const metadata: Metadata = {
     siteName: "Invyto",
     images: [
       {
-        url: "https://www.invyto.in/manjima/Untitled%20design%20(62).png",
+        url: "https://www.invyto.in/manjima/ogmanjima.jpg",
         width: 1200,
         height: 630,
         alt: "Manjima & Srujith Wedding  Invitation",
-        type: "image/png",
+        type: "image/jpeg",
       },
     ],
     locale: "en_IN",
@@ -51,7 +51,7 @@ export const metadata: Metadata = {
     title: "Manjima S & Srujith P.B | Invyto Wedding Invitation",
     description: "Join us to celebrate Manjima and Srujith.",
     images: [
-      "https://www.invyto.in/manjima/Untitled%20design%20(62).png",
+      "https://www.invyto.in/manjima/ogmanjima.jpg",
     ],
   },
   robots: {
