@@ -90,13 +90,6 @@ export default function StudioLoginPage() {
           </button>
         </form>
 
-        <div className="mt-5 rounded-xl border border-zinc-200 bg-zinc-50 p-3">
-          <p className="text-xs font-semibold text-zinc-800">Sample credential</p>
-          <p className="mt-1 text-xs text-zinc-700">
-            Use the first user you created via backend register endpoint.
-          </p>
-          <p className="mt-1 text-xs font-mono text-zinc-700">admin@invyto.local / password123</p>
-        </div>
       </div>
     </main>
   );
