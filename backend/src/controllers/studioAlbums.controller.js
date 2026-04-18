@@ -31,9 +31,53 @@ async function updateAlbum(req, res) {
   return sendResult(res, result);
 }
 
+async function prepareBannerDirectUpload(req, res) {
+  try {
+    const result = await studioAlbumsService.prepareBannerDirectUpload(req.user, req.params.albumId, req.body);
+    return sendResult(res, result);
+  } catch (err) {
+    // eslint-disable-next-line no-console
+    console.error(err);
+    return res.status(500).json({ message: err.message || "Server error" });
+  }
+}
+
+async function commitBannerDirectUpload(req, res) {
+  try {
+    const result = await studioAlbumsService.commitBannerDirectUpload(req.user, req.params.albumId, req.body);
+    return sendResult(res, result, 201);
+  } catch (err) {
+    // eslint-disable-next-line no-console
+    console.error(err);
+    return res.status(500).json({ message: err.message || "Server error" });
+  }
+}
+
 async function uploadBanner(req, res) {
   const result = await studioAlbumsService.uploadBanner(req.user, req.params.albumId, req.file, req);
   return sendResult(res, result);
+}
+
+async function prepareHighlightsDirectUpload(req, res) {
+  try {
+    const result = await studioAlbumsService.prepareHighlightsDirectUploads(req.user, req.params.albumId, req.body);
+    return sendResult(res, result);
+  } catch (err) {
+    // eslint-disable-next-line no-console
+    console.error(err);
+    return res.status(500).json({ message: err.message || "Server error" });
+  }
+}
+
+async function commitHighlightsDirectUpload(req, res) {
+  try {
+    const result = await studioAlbumsService.commitHighlightsDirectUploads(req.user, req.params.albumId, req.body);
+    return sendResult(res, result, 201);
+  } catch (err) {
+    // eslint-disable-next-line no-console
+    console.error(err);
+    return res.status(500).json({ message: err.message || "Server error" });
+  }
 }
 
 async function uploadHighlights(req, res) {
@@ -59,6 +103,38 @@ async function updateGalleryTab(req, res) {
 async function deleteGalleryTab(req, res) {
   const result = await studioAlbumsService.deleteGalleryTab(req.user, req.params.albumId, req.params.tabId);
   return sendResult(res, result);
+}
+
+async function prepareGalleryTabDirectUpload(req, res) {
+  try {
+    const result = await studioAlbumsService.prepareGalleryTabDirectUploads(
+      req.user,
+      req.params.albumId,
+      req.params.tabId,
+      req.body
+    );
+    return sendResult(res, result);
+  } catch (err) {
+    // eslint-disable-next-line no-console
+    console.error(err);
+    return res.status(500).json({ message: err.message || "Server error" });
+  }
+}
+
+async function commitGalleryTabDirectUpload(req, res) {
+  try {
+    const result = await studioAlbumsService.commitGalleryTabDirectUploads(
+      req.user,
+      req.params.albumId,
+      req.params.tabId,
+      req.body
+    );
+    return sendResult(res, result, 201);
+  } catch (err) {
+    // eslint-disable-next-line no-console
+    console.error(err);
+    return res.status(500).json({ message: err.message || "Server error" });
+  }
 }
 
 async function uploadTabImages(req, res) {
@@ -87,11 +163,17 @@ module.exports = {
   listAlbums,
   getAlbum,
   updateAlbum,
+  prepareBannerDirectUpload,
+  commitBannerDirectUpload,
   uploadBanner,
+  prepareHighlightsDirectUpload,
+  commitHighlightsDirectUpload,
   uploadHighlights,
   createGalleryTab,
   updateGalleryTab,
   deleteGalleryTab,
+  prepareGalleryTabDirectUpload,
+  commitGalleryTabDirectUpload,
   uploadTabImages,
   deleteImage,
   publishAlbum,

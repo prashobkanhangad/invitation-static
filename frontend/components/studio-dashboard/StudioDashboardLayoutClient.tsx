@@ -4,7 +4,35 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { Bell, Menu, Search, X } from "lucide-react";
-import { STUDIO_OVERVIEW_HREF, studioNavItems } from "./nav";
+import { STUDIO_USER_UPDATED_EVENT } from "@/utils/studioSession";
+import { STUDIO_OVERVIEW_HREF, getStudioNavItemsByRole, type StudioUserRole } from "./nav";
+
+function readStudioUserFromStorage(): {
+  studioName?: string;
+  name?: string;
+  email?: string;
+  role?: string;
+} | null {
+  try {
+    const raw = window.localStorage.getItem("studio_user");
+    return raw ? (JSON.parse(raw) as { studioName?: string; name?: string; email?: string; role?: string }) : null;
+  } catch {
+    return null;
+  }
+}
+
+function workspaceBrandFromUser(user: { studioName?: string; name?: string } | null) {
+  const v = String(user?.studioName || user?.name || "").trim();
+  return v || "Studio";
+}
+
+function initialsFromUser(user: { studioName?: string; name?: string; email?: string } | null) {
+  const raw = String(user?.studioName || user?.name || user?.email || "").trim();
+  if (!raw) return "S";
+  const parts = raw.split(/\s+/).filter(Boolean);
+  if (parts.length >= 2) return (parts[0]!.charAt(0) + parts[1]!.charAt(0)).toUpperCase();
+  return raw.slice(0, 2).toUpperCase();
+}
 
 type Props = {
   children: React.ReactNode;
@@ -66,8 +94,9 @@ export default function StudioDashboardLayoutClient({ children }: Props) {
   const router = useRouter();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [authChecked, setAuthChecked] = useState(false);
-
-  const studioName = "Lumière Studios";
+  const [userRole, setUserRole] = useState<StudioUserRole | null>(null);
+  const [workspaceBrand, setWorkspaceBrand] = useState("Studio");
+  const [avatarInitials, setAvatarInitials] = useState("S");
 
   useEffect(() => {
     const token = window.localStorage.getItem("studio_token") || window.localStorage.getItem("auth_token");
@@ -75,8 +104,32 @@ export default function StudioDashboardLayoutClient({ children }: Props) {
       router.replace("/studio/login");
       return;
     }
+    try {
+      const rawUser = window.localStorage.getItem("studio_user");
+      const user = rawUser ? JSON.parse(rawUser) : null;
+      const role = user?.role;
+      setUserRole(role === "master_admin" ? "master_admin" : "studio");
+      setWorkspaceBrand(workspaceBrandFromUser(user));
+      setAvatarInitials(initialsFromUser(user));
+    } catch {
+      setUserRole("studio");
+    }
     setAuthChecked(true);
   }, [router]);
+
+  useEffect(() => {
+    const sync = () => {
+      const user = readStudioUserFromStorage();
+      setWorkspaceBrand(workspaceBrandFromUser(user));
+      setAvatarInitials(initialsFromUser(user));
+      const r = user?.role;
+      if (r === "master_admin" || r === "studio") setUserRole(r);
+    };
+    window.addEventListener(STUDIO_USER_UPDATED_EVENT, sync);
+    return () => window.removeEventListener(STUDIO_USER_UPDATED_EVENT, sync);
+  }, []);
+
+  const navItems = getStudioNavItemsByRole(userRole);
 
   const onLogout = () => {
     window.localStorage.removeItem("studio_token");
@@ -103,7 +156,7 @@ export default function StudioDashboardLayoutClient({ children }: Props) {
         >
           <div className="flex h-16 shrink-0 items-center justify-between gap-3 border-b border-zinc-100 px-4">
             <Link href={STUDIO_OVERVIEW_HREF} className="min-w-0" onClick={() => setMobileOpen(false)}>
-              <span className="block truncate text-sm font-semibold tracking-tight">{studioName}</span>
+              <span className="block truncate text-sm font-semibold tracking-tight">{workspaceBrand}</span>
               <span className="block truncate text-xs text-zinc-500">Studio workspace</span>
             </Link>
             <button
@@ -121,7 +174,7 @@ export default function StudioDashboardLayoutClient({ children }: Props) {
               Products
             </p>
             <nav className="space-y-1">
-              {studioNavItems.map((item) => {
+              {navItems.map((item) => {
                 const active =
                   item.href === STUDIO_OVERVIEW_HREF
                     ? pathname === STUDIO_OVERVIEW_HREF
@@ -139,15 +192,6 @@ export default function StudioDashboardLayoutClient({ children }: Props) {
                 );
               })}
             </nav>
-          </div>
-
-          <div className="shrink-0 border-t border-zinc-100 p-4">
-            <div className="rounded-xl border border-zinc-200 bg-zinc-50 p-3">
-              <p className="text-xs font-semibold text-zinc-900">UI preview</p>
-              <p className="mt-1 text-xs leading-relaxed text-zinc-600">
-                This dashboard is front-end only. Wire your APIs when you are ready to ship.
-              </p>
-            </div>
           </div>
         </aside>
 
@@ -202,7 +246,7 @@ export default function StudioDashboardLayoutClient({ children }: Props) {
                   <Bell className="h-5 w-5" strokeWidth={1.75} />
                 </button>
                 <div className="hidden h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-zinc-900 to-zinc-700 text-sm font-semibold text-white sm:flex">
-                  LS
+                  {avatarInitials}
                 </div>
               </div>
             </div>

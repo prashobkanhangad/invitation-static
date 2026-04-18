@@ -2,7 +2,8 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Image from "next/image";
-import { ChevronLeft, ChevronRight } from "lucide-react";
+import { X } from "lucide-react";
+import { API_BASE_URL } from "@/utils/api";
 import {
   DEFAULT_DIGITAL_ALBUM_TEMPLATE_ID,
   getDigitalAlbumTemplatePreview,
@@ -16,21 +17,23 @@ type GalleryTab = {
   images: string[];
 };
 
-export default function DigitalAlbumTemplatePreview({
-  templateId,
-  template,
-  imageThumbs,
-  bannerImage,
-  highlightImages,
-  galleryTabs,
-}: {
+type GalleryImageAsset = {
+  id: string;
+  src: string;
+  originalSrc?: string | null;
+};
+
+export default function DigitalAlbumTemplatePreview(props: {
   templateId?: DigitalAlbumTemplateId | string;
   template?: DigitalAlbumTemplatePreviewConfig;
   imageThumbs?: string[];
+  imageAssets?: GalleryImageAsset[];
+  albumDownloadLookup?: { kind: "shareToken" | "slug"; value: string };
   bannerImage?: string | null;
   highlightImages?: string[];
   galleryTabs?: GalleryTab[];
 }) {
+  const { templateId, template, imageThumbs, imageAssets, albumDownloadLookup, galleryTabs } = props;
   const config = useMemo(() => {
     if (template) return template;
     if (!templateId) return digitalFallbackTemplate();
@@ -38,11 +41,23 @@ export default function DigitalAlbumTemplatePreview({
   }, [template, templateId]);
 
   const sourceImages = (imageThumbs?.length ? imageThumbs : config.thumbs).filter(Boolean);
-  const resolvedBannerImage = bannerImage ?? sourceImages[0] ?? config.coverSrc;
-  const highlights = (highlightImages?.length ? highlightImages : sourceImages.length ? sourceImages : [config.coverSrc]).slice(0, 8);
+  const imageSourceMap = useMemo(() => {
+    const map = new Map<string, GalleryImageAsset>();
+    (imageAssets || [])
+      .filter(
+        (item) =>
+          typeof item?.id === "string" &&
+          item.id.trim().length > 0 &&
+          typeof item?.src === "string" &&
+          item.src.trim().length > 0
+      )
+      .forEach((item) => map.set(item.src, item));
+    return map;
+  }, [imageAssets]);
 
   const resolvedGalleryTabs = useMemo<GalleryTab[]>(() => {
-    if (galleryTabs?.length) {
+    // When galleryTabs is provided (including []), never fall back to template thumbs — studio create flow relies on this.
+    if (galleryTabs != null) {
       return galleryTabs.filter((t) => t.images.length > 0);
     }
     const imgs = sourceImages.length ? sourceImages : config.thumbs;
@@ -58,8 +73,12 @@ export default function DigitalAlbumTemplatePreview({
     ].filter((t) => t.images.length > 0);
   }, [config.thumbs, galleryTabs, sourceImages]);
 
-  const [highlightIndex, setHighlightIndex] = useState(0);
   const [activeGalleryTabId, setActiveGalleryTabId] = useState<string>(resolvedGalleryTabs[0]?.id ?? "all");
+  const [previewSrc, setPreviewSrc] = useState<string | null>(null);
+  const [downloadMenuOpen, setDownloadMenuOpen] = useState(false);
+  const previewAsset = previewSrc ? imageSourceMap.get(previewSrc) : undefined;
+  const previewAssetId = previewAsset?.id || "";
+  const previewOriginalSrc = previewAsset?.originalSrc || "";
 
   const activeGalleryTab = resolvedGalleryTabs.find((t) => t.id === activeGalleryTabId) ?? resolvedGalleryTabs[0];
 
@@ -69,91 +88,62 @@ export default function DigitalAlbumTemplatePreview({
     if (!exists) setActiveGalleryTabId(resolvedGalleryTabs[0].id);
   }, [activeGalleryTabId, resolvedGalleryTabs]);
 
-  const nextHighlight = () => {
-    setHighlightIndex((idx) => (highlights.length === 0 ? 0 : (idx + 1) % highlights.length));
+  useEffect(() => {
+    if (!previewSrc) return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setPreviewSrc(null);
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [previewSrc]);
+
+  useEffect(() => {
+    if (!previewSrc) setDownloadMenuOpen(false);
+  }, [previewSrc]);
+
+  const triggerDownload = async (url: string, fileName: string) => {
+    if (!url) throw new Error("Download URL not available");
+    const res = await fetch(url);
+    if (!res.ok) throw new Error("Download failed");
+    const blob = await res.blob();
+    const objectUrl = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = objectUrl;
+    a.download = fileName;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    window.setTimeout(() => URL.revokeObjectURL(objectUrl), 60_000);
   };
 
-  const prevHighlight = () => {
-    setHighlightIndex((idx) =>
-      highlights.length === 0 ? 0 : (idx - 1 + highlights.length) % highlights.length
-    );
+  const filenameFromUrl = (url: string, fallback = "image") => {
+    try {
+      const pathname = new URL(url).pathname;
+      const part = pathname.split("/").filter(Boolean).pop() || "";
+      const base = decodeURIComponent(part).trim();
+      return base || fallback;
+    } catch {
+      return fallback;
+    }
   };
 
-  const currentHighlight = highlights[highlightIndex] ?? bannerImage;
+  const albumDownloadUrl = (imageId: string, variant: "optimized" | "original") => {
+    if (!albumDownloadLookup || !albumDownloadLookup.value || !imageId) return "";
+    const enc = encodeURIComponent;
+    if (albumDownloadLookup.kind === "shareToken") {
+      return `${API_BASE_URL}/api/public/projects/${enc(albumDownloadLookup.value)}/album-images/${enc(imageId)}/download?variant=${variant}`;
+    }
+    return `${API_BASE_URL}/api/public/projects/slug/${enc(albumDownloadLookup.value)}/album-images/${enc(imageId)}/download?variant=${variant}`;
+  };
 
   return (
-    <div className="overflow-hidden rounded-2xl border border-black/5 bg-[#f5efe4]">
-      <section className="relative h-[78vh] min-h-[420px] w-full bg-black">
-        <Image
-          src={resolvedBannerImage}
-          alt={config.coverAlt || "Album banner"}
-          fill
-          sizes="100vw"
-          className="object-cover"
-          priority
-        />
-        <div className="absolute inset-0 bg-gradient-to-t from-black/65 via-black/25 to-transparent" />
-        <div className="absolute bottom-0 left-0 right-0 p-5 sm:p-8">
-          <p className="text-[11px] uppercase tracking-[0.3em] text-white/85">{config.subtitle}</p>
-          <h2 className="mt-2 text-3xl font-serif text-white sm:text-4xl">{config.title}</h2>
-        </div>
-      </section>
-
-      <section className="border-t border-black/5 bg-white/70 p-4 sm:p-6">
-        <div className="mb-3 flex items-center justify-between">
-          <p className="text-xs font-semibold uppercase tracking-[0.25em] text-[#8b6914]">Highlights</p>
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={prevHighlight}
-              className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-zinc-300 bg-white text-zinc-700 hover:bg-zinc-50"
-              aria-label="Previous highlight"
-            >
-              <ChevronLeft className="h-4 w-4" strokeWidth={2} />
-            </button>
-            <button
-              type="button"
-              onClick={nextHighlight}
-              className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-zinc-300 bg-white text-zinc-700 hover:bg-zinc-50"
-              aria-label="Next highlight"
-            >
-              <ChevronRight className="h-4 w-4" strokeWidth={2} />
-            </button>
-          </div>
-        </div>
-
-        <div className="relative aspect-[16/9] overflow-hidden rounded-xl border border-black/5 bg-black/5">
-          <Image
-            src={currentHighlight}
-            alt={`Highlight ${highlightIndex + 1}`}
-            fill
-            sizes="(max-width: 768px) 100vw, 900px"
-            className="object-cover"
-          />
-        </div>
-
-        {highlights.length > 1 ? (
-          <div className="mt-3 flex gap-2 overflow-x-auto pb-1">
-            {highlights.map((src, idx) => (
-              <button
-                key={`${src}-${idx}`}
-                type="button"
-                onClick={() => setHighlightIndex(idx)}
-                className={[
-                  "relative h-14 w-20 shrink-0 overflow-hidden rounded-lg border",
-                  idx === highlightIndex ? "border-zinc-900" : "border-zinc-200",
-                ].join(" ")}
-                aria-label={`Show highlight ${idx + 1}`}
-              >
-                <Image src={src} alt="" fill sizes="80px" className="object-cover" />
-              </button>
-            ))}
-          </div>
-        ) : null}
-      </section>
-
-      <section className="border-t border-black/5 bg-[#f7f2e9] p-4 sm:p-6">
+    <div className="overflow-hidden border border-black/5 bg-[#f5efe4]">
+      <section className="border-t border-black/5 bg-[#f7f2e9] px-2 py-4 sm:py-6">
         <p className="text-xs font-semibold uppercase tracking-[0.25em] text-[#8b6914]">Gallery</p>
+        {resolvedGalleryTabs.length === 0 ? (
+          <p className="mt-3 text-sm text-zinc-600">No gallery photos yet.</p>
+        ) : (
+          <>
         <div className="mt-3 flex gap-2 overflow-x-auto pb-1">
           {resolvedGalleryTabs.map((tab) => (
             <button
@@ -172,23 +162,105 @@ export default function DigitalAlbumTemplatePreview({
           ))}
         </div>
 
-        <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4">
+        <div className="mt-4 columns-2 gap-x-2 sm:columns-3 lg:columns-4">
           {(activeGalleryTab?.images ?? []).map((src, idx) => (
             <div
               key={`${activeGalleryTab?.id ?? "tab"}-${src}-${idx}`}
-              className="relative aspect-[4/5] overflow-hidden rounded-lg border border-black/5 bg-black/5"
+              className="mb-2 break-inside-avoid overflow-hidden rounded-lg border border-black/5 bg-black/5"
             >
-              <Image
-                src={src}
-                alt={`Gallery image ${idx + 1}`}
-                fill
-                sizes="(max-width: 768px) 50vw, 220px"
-                className="object-cover"
-              />
+              <button
+                type="button"
+                onClick={() => setPreviewSrc(src)}
+                className="block w-full"
+                aria-label={`Preview gallery image ${idx + 1}`}
+              >
+                <Image
+                  src={src}
+                  alt={`Gallery image ${idx + 1}`}
+                  width={1200}
+                  height={800}
+                  sizes="(max-width: 768px) 50vw, 25vw"
+                  className="h-auto w-full"
+                />
+              </button>
             </div>
           ))}
         </div>
+          </>
+        )}
       </section>
+
+      {previewSrc ? (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 p-4"
+          onClick={() => setPreviewSrc(null)}
+        >
+          <button
+            type="button"
+            onClick={() => setPreviewSrc(null)}
+            className="absolute right-4 top-4 inline-flex h-10 w-10 items-center justify-center rounded-full border border-white/30 bg-black/40 text-white hover:bg-black/60"
+            aria-label="Close image preview"
+          >
+            <X className="h-5 w-5" strokeWidth={2} />
+          </button>
+          <div
+            className="relative max-h-[92vh] w-full max-w-5xl overflow-hidden rounded-xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <Image
+              src={previewSrc}
+              alt="Selected gallery image"
+              width={1800}
+              height={1200}
+              sizes="100vw"
+              className="h-auto max-h-[92vh] w-full object-contain"
+            />
+          </div>
+          <div className="absolute bottom-4 left-1/2 z-[1] -translate-x-1/2" onClick={(e) => e.stopPropagation()}>
+            <div className="relative">
+              {downloadMenuOpen ? (
+                <div className="absolute bottom-12 left-1/2 flex w-[220px] -translate-x-1/2 flex-col overflow-hidden rounded-xl border border-white/25 bg-black/70 backdrop-blur">
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      const downloadUrl =
+                        previewAssetId && albumDownloadLookup
+                          ? albumDownloadUrl(previewAssetId, "optimized")
+                          : previewSrc;
+                      await triggerDownload(downloadUrl, filenameFromUrl(previewSrc, "image-optimized"));
+                      setDownloadMenuOpen(false);
+                    }}
+                    className="px-4 py-2.5 text-left text-sm font-semibold text-white hover:bg-white/10"
+                  >
+                    Download optimized
+                  </button>
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      const hi =
+                        previewAssetId && albumDownloadLookup
+                          ? albumDownloadUrl(previewAssetId, "original")
+                          : previewOriginalSrc || previewSrc;
+                      await triggerDownload(hi, filenameFromUrl(hi, "image-original"));
+                      setDownloadMenuOpen(false);
+                    }}
+                    className="border-t border-white/20 px-4 py-2.5 text-left text-sm font-semibold text-white hover:bg-white/10"
+                  >
+                    Download high quality
+                  </button>
+                </div>
+              ) : null}
+              <button
+                type="button"
+                onClick={() => setDownloadMenuOpen((v) => !v)}
+                className="inline-flex h-11 items-center justify-center rounded-full border border-white/30 bg-black/40 px-5 text-sm font-semibold text-white hover:bg-black/60"
+              >
+                Download
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }

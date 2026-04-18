@@ -5,41 +5,35 @@ import {
   ArrowLeft,
   Check,
   ChevronRight,
+  Eye,
+  EyeOff,
   FolderOpen,
   Heart,
   ImagePlus,
   Layers,
+  Link2,
+  Lock,
   Maximize2,
   Plus,
   Upload,
   X,
 } from "lucide-react";
-import ClientSelectionPreview from "@/components/studio-dashboard/ClientSelectionPreview";
 import type { ClientPreviewTab } from "@/components/studio-dashboard/clientPreviewTypes";
 import { GhostButton, PageHeader, PrimaryButton, StatusBadge } from "@/components/studio-dashboard/blocks";
 import { studioApiFetch } from "@/utils/studioApi";
+import { uploadPhotoSelectionDirect } from "@/utils/studioDirectUpload";
 
-const STUDIO_DISPLAY_NAME = "Lumière Studios";
-
-const palette = [
-  "from-amber-200 to-orange-300",
-  "from-rose-200 to-fuchsia-300",
-  "from-sky-200 to-indigo-300",
-  "from-emerald-200 to-teal-300",
-  "from-zinc-200 to-zinc-400",
-  "from-violet-200 to-purple-300",
-];
+const STUDIO_TABLE_SHIMMER =
+  "bg-gradient-to-r from-zinc-200 via-zinc-50 to-zinc-200 bg-[length:200%_100%] animate-shimmer";
 
 type SelectionRoundBadge = { label: string; tone: "good" | "warn" | "neutral" };
 
 type SelectionPhoto = {
   id: string;
-  kind: "sample" | "upload";
   picked: boolean;
   fav: boolean;
   /** When client tabs exist, groups the photo in that section (`null` = only under “All” in client preview). */
   tabId: string | null;
-  gradient?: string;
   blobUrl?: string;
   /** Full original filename for client downloads (uploads only). */
   fileName?: string;
@@ -56,7 +50,11 @@ type SelectionProject = {
   clientPreviewTabs: ClientPreviewTab[];
   /** Client gallery / link treated as live (UI only). */
   published: boolean;
-  goal: number;
+  shareToken: string | null;
+  /** Public client URL uses `/photos/{slug}`. */
+  slug: string | null;
+  /** When true, clients must enter PIN to open the public gallery. */
+  pinEnabled: boolean;
   stats: {
     uploadedLabel: string;
     visibleToClient: number;
@@ -64,78 +62,6 @@ type SelectionProject = {
   };
   photos: SelectionPhoto[];
 };
-
-function makeSampleTiles(count: number, offset = 0): SelectionPhoto[] {
-  return Array.from({ length: count }, (_, i) => {
-    const n = i + 1 + offset;
-    const id = String(n);
-    const picked = [2, 5, 7, 9, 12, 15, 18].includes(n);
-    const fav = [5, 12].includes(n);
-    return {
-      id: `sample-${n}`,
-      kind: "sample" as const,
-      picked,
-      fav,
-      tabId: null as string | null,
-      gradient: palette[i % palette.length]!,
-      label: `IMG #${String(n).padStart(4, "0")}`,
-    };
-  });
-}
-
-const initialProjects: SelectionProject[] = [
-  {
-    id: "sel_ritu_omar",
-    name: "Ritu & Omar",
-    subtitle: "",
-    round: { label: "Round 2", tone: "warn" },
-    clientPreviewTabs: [
-      { id: "tab_ceremony", label: "Ceremony" },
-      { id: "tab_reception", label: "Reception" },
-    ],
-    published: false,
-    goal: 120,
-    stats: {
-      uploadedLabel: "6,430",
-      visibleToClient: 4820,
-      hidden: 1610,
-    },
-    photos: makeSampleTiles(24, 0).map((photo, i) => ({
-      ...photo,
-      tabId: i < 12 ? "tab_ceremony" : "tab_reception",
-    })),
-  },
-  {
-    id: "sel_meera_vik",
-    name: "Meera & Vikram",
-    subtitle: "",
-    round: { label: "Round 1", tone: "neutral" },
-    clientPreviewTabs: [],
-    published: false,
-    goal: 80,
-    stats: {
-      uploadedLabel: "3,200",
-      visibleToClient: 2900,
-      hidden: 300,
-    },
-    photos: makeSampleTiles(18, 100),
-  },
-  {
-    id: "sel_aina",
-    name: "Aina — Portraits",
-    subtitle: "",
-    round: { label: "Final review", tone: "good" },
-    clientPreviewTabs: [],
-    published: false,
-    goal: 40,
-    stats: {
-      uploadedLabel: "640",
-      visibleToClient: 640,
-      hidden: 0,
-    },
-    photos: makeSampleTiles(12, 220),
-  },
-];
 
 function toneForRound(tone: SelectionRoundBadge["tone"]) {
   if (tone === "good") return "good" as const;
@@ -145,22 +71,32 @@ function toneForRound(tone: SelectionRoundBadge["tone"]) {
 
 export default function StudioPhotoSelectionSection() {
   const [projects, setProjects] = useState<SelectionProject[]>([]);
+  const [projectsLoading, setProjectsLoading] = useState(true);
   const [activeProjectId, setActiveProjectId] = useState<string | null>(null);
   const [projectsError, setProjectsError] = useState<string | null>(null);
   const [newProjectOpen, setNewProjectOpen] = useState(false);
   const [newProjectName, setNewProjectName] = useState("");
   const [newProjectDetails, setNewProjectDetails] = useState("");
-  const [clientPreviewOpen, setClientPreviewOpen] = useState(false);
+  const [newProjectPinEnabled, setNewProjectPinEnabled] = useState(false);
+  const [newProjectPin, setNewProjectPin] = useState("");
   const [newTabLabelDraft, setNewTabLabelDraft] = useState("");
+  const [pinDraftEnabled, setPinDraftEnabled] = useState(false);
+  const [pinDraftInput, setPinDraftInput] = useState("");
+  const [workspacePinVisible, setWorkspacePinVisible] = useState(false);
+  const [pinSettingsSaving, setPinSettingsSaving] = useState(false);
+  const [pinSettingsMessage, setPinSettingsMessage] = useState<string | null>(null);
+  const [newProjectPinVisible, setNewProjectPinVisible] = useState(false);
   const [uploadModalOpen, setUploadModalOpen] = useState(false);
   const [uploadModalFiles, setUploadModalFiles] = useState<File[]>([]);
   const [uploadModalPreviewUrls, setUploadModalPreviewUrls] = useState<string[]>([]);
   const [uploadModalTabChoice, setUploadModalTabChoice] = useState("");
   const [uploadModalSubmitting, setUploadModalSubmitting] = useState(false);
+  const [uploadModalProgress, setUploadModalProgress] = useState(0);
   const [uploadModalError, setUploadModalError] = useState<string | null>(null);
   const [studioFilterSelectedOnly, setStudioFilterSelectedOnly] = useState(false);
   const [studioFilterFavouriteOnly, setStudioFilterFavouriteOnly] = useState(false);
   const [studioImagePreviewId, setStudioImagePreviewId] = useState<string | null>(null);
+  const [copiedProjectId, setCopiedProjectId] = useState<string | null>(null);
 
   const uploadModalInputId = useId();
 
@@ -168,7 +104,6 @@ export default function StudioPhotoSelectionSection() {
     const photos = Array.isArray(p?.photoSelection?.photos)
       ? p.photoSelection.photos.map((ph: any, idx: number) => ({
           id: String(ph.id ?? `ph-${idx}`),
-          kind: "upload" as const,
           picked: Boolean(ph.picked),
           fav: Boolean(ph.fav),
           tabId: (typeof ph.tabId === "string" ? ph.tabId : null) as string | null,
@@ -184,7 +119,6 @@ export default function StudioPhotoSelectionSection() {
           label: String(t.label || "Tab"),
         }))
       : [];
-    const goal = Number(p?.photoSelection?.goal || 120);
     return {
       id: String(p?._id ?? p?.id ?? ""),
       name: String(p?.name ?? "Untitled project"),
@@ -192,7 +126,9 @@ export default function StudioPhotoSelectionSection() {
       round: { label: p?.photoSelection?.published ? "Published" : "Draft", tone: p?.photoSelection?.published ? "good" : "neutral" },
       clientPreviewTabs: tabs,
       published: Boolean(p?.photoSelection?.published),
-      goal,
+      shareToken: typeof p?.shareToken === "string" ? p.shareToken : null,
+      slug: typeof p?.slug === "string" && p.slug ? p.slug : null,
+      pinEnabled: Boolean(p?.photoSelection?.pinEnabled),
       stats: {
         uploadedLabel: String(photos.length),
         visibleToClient: photos.length,
@@ -205,6 +141,7 @@ export default function StudioPhotoSelectionSection() {
   useEffect(() => {
     let cancelled = false;
     async function loadProjects() {
+      setProjectsLoading(true);
       setProjectsError(null);
       try {
         const data = await studioApiFetch<{ projects: any[] }>("/api/studio/photo-selection/projects");
@@ -213,7 +150,9 @@ export default function StudioPhotoSelectionSection() {
       } catch (e) {
         if (cancelled) return;
         setProjectsError(e instanceof Error ? e.message : "Failed to load projects");
-        setProjects(initialProjects);
+        setProjects([]);
+      } finally {
+        if (!cancelled) setProjectsLoading(false);
       }
     }
     void loadProjects();
@@ -226,6 +165,25 @@ export default function StudioPhotoSelectionSection() {
     () => projects.find((p) => p.id === activeProjectId) ?? null,
     [projects, activeProjectId]
   );
+
+  const pinSettingsDirty = useMemo(() => {
+    if (!activeProject) return false;
+    if (pinDraftEnabled !== activeProject.pinEnabled) return true;
+    if (pinDraftEnabled && activeProject.pinEnabled && pinDraftInput.trim().length > 0) return true;
+    return false;
+  }, [activeProject, pinDraftEnabled, pinDraftInput]);
+
+  const canSavePinSettings = useMemo(() => {
+    if (!pinSettingsDirty || !activeProject) return false;
+    if (!pinDraftEnabled && activeProject.pinEnabled) return true;
+    if (pinDraftEnabled && !activeProject.pinEnabled) {
+      return /^\d{4,8}$/.test(pinDraftInput.trim());
+    }
+    if (pinDraftEnabled && activeProject.pinEnabled && pinDraftInput.trim()) {
+      return /^\d{4,8}$/.test(pinDraftInput.trim());
+    }
+    return false;
+  }, [pinSettingsDirty, activeProject, pinDraftEnabled, pinDraftInput]);
 
   const pickedCount = activeProject ? activeProject.photos.filter((p) => p.picked).length : 0;
 
@@ -242,6 +200,9 @@ export default function StudioPhotoSelectionSection() {
     setStudioImagePreviewId(null);
     setStudioFilterSelectedOnly(false);
     setStudioFilterFavouriteOnly(false);
+    setPinDraftInput("");
+    setPinSettingsMessage(null);
+    setWorkspacePinVisible(false);
     if (!activeProjectId) {
       setUploadModalOpen(false);
       setUploadModalPreviewUrls((prev) => {
@@ -252,6 +213,11 @@ export default function StudioPhotoSelectionSection() {
       setUploadModalTabChoice("");
     }
   }, [activeProjectId]);
+
+  useEffect(() => {
+    if (!activeProject) return;
+    setPinDraftEnabled(activeProject.pinEnabled);
+  }, [activeProjectId, activeProject?.pinEnabled]);
 
   useEffect(() => {
     if (!studioImagePreviewId) return;
@@ -310,9 +276,30 @@ export default function StudioPhotoSelectionSection() {
   const publishSelection = async () => {
     if (!activeProjectId) return;
     try {
-      await studioApiFetch(`/api/studio/photo-selection/projects/${activeProjectId}/publish`, { method: "POST" });
+      const resp = await studioApiFetch<{ project: any }>(`/api/studio/photo-selection/projects/${activeProjectId}/publish`, {
+        method: "POST",
+      });
+      const mapped = resp?.project ? mapApiProjectToUi(resp.project) : null;
       setProjects((prev) =>
-        prev.map((p) => (p.id === activeProjectId ? { ...p, published: true, round: { label: "Published", tone: "good" } } : p))
+        prev.map((p) =>
+          p.id === activeProjectId
+            ? mapped
+              ? { ...p, ...mapped, photos: p.photos }
+              : {
+                  ...p,
+                  published: true,
+                  shareToken:
+                    typeof resp?.project?.shareToken === "string" && resp.project.shareToken
+                      ? resp.project.shareToken
+                      : p.shareToken,
+                  slug:
+                    typeof resp?.project?.slug === "string" && resp.project.slug.trim()
+                      ? resp.project.slug.trim()
+                      : p.slug,
+                  round: { label: "Published", tone: "good" },
+                }
+            : p
+        )
       );
     } catch (e) {
       window.alert(e instanceof Error ? e.message : "Failed to publish");
@@ -323,19 +310,17 @@ export default function StudioPhotoSelectionSection() {
     const label = newTabLabelDraft.trim();
     if (!label || !activeProjectId) return;
     const tabId = `tab_${Date.now()}`;
+    const existingTabs = projects.find((p) => p.id === activeProjectId)?.clientPreviewTabs ?? [];
+    const updatedTabs = [...existingTabs, { id: tabId, label }];
     setProjects((prev) =>
       prev.map((p) =>
         p.id !== activeProjectId
           ? p
-          : { ...p, clientPreviewTabs: [...p.clientPreviewTabs, { id: tabId, label }] }
+          : { ...p, clientPreviewTabs: updatedTabs }
       )
     );
     setNewTabLabelDraft("");
     try {
-      const updatedTabs =
-        projects.find((p) => p.id === activeProjectId)?.clientPreviewTabs.map((t) =>
-          t.id === tabId ? { ...t, label } : t
-        ) ?? [];
       await studioApiFetch(`/api/studio/photo-selection/projects/${activeProjectId}`, {
         method: "PATCH",
         body: {
@@ -367,6 +352,38 @@ export default function StudioPhotoSelectionSection() {
     } catch {}
   };
 
+  const savePinSettings = async () => {
+    if (!activeProjectId || !activeProject || !canSavePinSettings) return;
+    setPinSettingsSaving(true);
+    setPinSettingsMessage(null);
+    try {
+      let body: Record<string, unknown>;
+      if (!pinDraftEnabled && activeProject.pinEnabled) {
+        body = { pinEnabled: false };
+      } else if (pinDraftEnabled && !activeProject.pinEnabled) {
+        body = { pinEnabled: true, pin: pinDraftInput.trim() };
+      } else {
+        body = { pin: pinDraftInput.trim() };
+      }
+
+      const resp = await studioApiFetch<{ project: any }>(`/api/studio/photo-selection/projects/${activeProjectId}`, {
+        method: "PATCH",
+        body,
+      });
+      const mapped = mapApiProjectToUi(resp.project);
+      setProjects((prev) =>
+        prev.map((proj) => (proj.id === activeProjectId ? { ...proj, ...mapped, photos: proj.photos } : proj))
+      );
+      setPinDraftInput("");
+      setPinDraftEnabled(mapped.pinEnabled);
+      setPinSettingsMessage("PIN settings saved.");
+    } catch (e) {
+      window.alert(e instanceof Error ? e.message : "Could not update PIN settings");
+    } finally {
+      setPinSettingsSaving(false);
+    }
+  };
+
   const commitPhotoUpload = async (files: File[], tabId: string | null) => {
     if (!activeProjectId || !files.length) return;
     setProjects((prev) =>
@@ -374,7 +391,6 @@ export default function StudioPhotoSelectionSection() {
         if (p.id !== activeProjectId) return p;
         const nextPhotos = files.map((file, idx) => ({
           id: `up-${Date.now()}-${idx}-${Math.random().toString(16).slice(2)}`,
-          kind: "upload" as const,
           picked: false,
           fav: false,
           tabId,
@@ -395,19 +411,18 @@ export default function StudioPhotoSelectionSection() {
         };
       })
     );
-    const fd = new FormData();
-    files.forEach((f) => fd.append("images", f));
-    if (tabId) fd.append("tabId", tabId);
-    const resp = await studioApiFetch<{ photos: any[] }>(`/api/studio/photo-selection/projects/${activeProjectId}/photos`, {
-      method: "POST",
-      formData: fd,
+    const photos = await uploadPhotoSelectionDirect({
+      projectId: activeProjectId,
+      files,
+      tabId,
+      api: studioApiFetch,
+      onProgress: (progress) => setUploadModalProgress(progress),
     });
     setProjects((prev) =>
       prev.map((p) => {
         if (p.id !== activeProjectId) return p;
-        const persisted = resp.photos.map((ph, idx) => ({
+        const persisted = photos.map((ph, idx) => ({
           id: String(ph.id ?? `up-${Date.now()}-${idx}`),
-          kind: "upload" as const,
           picked: Boolean(ph.picked),
           fav: Boolean(ph.fav),
           tabId: (typeof ph.tabId === "string" ? ph.tabId : null) as string | null,
@@ -416,13 +431,14 @@ export default function StudioPhotoSelectionSection() {
           fileName: String(ph.originalName || ""),
           mimeType: String(ph.mimeType || ""),
         }));
+        const merged = [...p.photos.filter((ph) => !ph.id.startsWith("up-")), ...persisted];
         return {
           ...p,
-          photos: [...p.photos.filter((ph) => !ph.id.startsWith("up-")), ...persisted],
+          photos: merged,
           stats: {
             ...p.stats,
-            uploadedLabel: String(persisted.length),
-            visibleToClient: persisted.length,
+            uploadedLabel: String(merged.length),
+            visibleToClient: merged.length,
           },
         };
       })
@@ -438,6 +454,7 @@ export default function StudioPhotoSelectionSection() {
     setUploadModalTabChoice("");
     setUploadModalError(null);
     setUploadModalSubmitting(false);
+    setUploadModalProgress(0);
     setUploadModalOpen(true);
   };
 
@@ -452,6 +469,7 @@ export default function StudioPhotoSelectionSection() {
     setUploadModalTabChoice("");
     setUploadModalError(null);
     setUploadModalSubmitting(false);
+    setUploadModalProgress(0);
   };
 
   const onModalFilesPicked = (fileList: FileList | null) => {
@@ -476,6 +494,7 @@ export default function StudioPhotoSelectionSection() {
     if (uploadModalSubmitting) return;
     setUploadModalError(null);
     setUploadModalSubmitting(true);
+    setUploadModalProgress(0);
     const tabId = uploadModalTabChoice === "" ? null : uploadModalTabChoice;
     try {
       await commitPhotoUpload(uploadModalFiles, tabId);
@@ -484,12 +503,16 @@ export default function StudioPhotoSelectionSection() {
       setUploadModalError(e instanceof Error ? e.message : "Upload failed. Please try again.");
     } finally {
       setUploadModalSubmitting(false);
+      setUploadModalProgress(0);
     }
   };
 
   const resetNewProjectForm = () => {
     setNewProjectName("");
     setNewProjectDetails("");
+    setNewProjectPinEnabled(false);
+    setNewProjectPin("");
+    setNewProjectPinVisible(false);
   };
 
   const openNewProjectModal = () => {
@@ -505,6 +528,10 @@ export default function StudioPhotoSelectionSection() {
   const submitNewProject = async () => {
     const name = newProjectName.trim();
     if (!name) return;
+    if (newProjectPinEnabled && !/^\d{4,8}$/.test(newProjectPin.trim())) {
+      window.alert("PIN must be 4–8 digits when PIN protection is enabled.");
+      return;
+    }
     const details = newProjectDetails.trim();
     const id = `sel_${Date.now()}`;
     const next: SelectionProject = {
@@ -514,7 +541,9 @@ export default function StudioPhotoSelectionSection() {
       round: { label: "Draft", tone: "neutral" },
       clientPreviewTabs: [],
       published: false,
-      goal: 120,
+      shareToken: null,
+      slug: null,
+      pinEnabled: newProjectPinEnabled,
       stats: {
         uploadedLabel: "0",
         visibleToClient: 0,
@@ -525,7 +554,11 @@ export default function StudioPhotoSelectionSection() {
     try {
       const created = await studioApiFetch<{ project: any }>("/api/studio/photo-selection/projects", {
         method: "POST",
-        body: { name, goal: 120 },
+        body: {
+          name,
+          pinEnabled: newProjectPinEnabled,
+          ...(newProjectPinEnabled ? { pin: newProjectPin.trim() } : {}),
+        },
       });
       const mapped = mapApiProjectToUi(created.project);
       setProjects((prev) => [mapped, ...prev]);
@@ -535,6 +568,45 @@ export default function StudioPhotoSelectionSection() {
       setProjects((prev) => [next, ...prev]);
       setActiveProjectId(id);
       closeNewProjectModal();
+    }
+  };
+
+  const copyClientLink = async (project: SelectionProject) => {
+    if (!project.published) return;
+    const origin = window.location.origin;
+    let slug = typeof project.slug === "string" ? project.slug.trim() : "";
+
+    if (!slug && project.id) {
+      try {
+        const data = await studioApiFetch<{ project: { slug?: string } }>(
+          `/api/studio/photo-selection/projects/${project.id}`
+        );
+        const fromApi = typeof data.project?.slug === "string" ? data.project.slug.trim() : "";
+        if (fromApi) {
+          slug = fromApi;
+          setProjects((prev) => prev.map((p) => (p.id === project.id ? { ...p, slug: fromApi } : p)));
+        }
+      } catch {
+        /* ignore */
+      }
+    }
+
+    if (!slug) {
+      window.alert(
+        "No /photos/… slug yet. Publish the selection (or refresh the page), then copy again."
+      );
+      return;
+    }
+
+    const link = new URL(`/photos/${encodeURIComponent(slug)}`, origin).href;
+    try {
+      await navigator.clipboard.writeText(link);
+      setCopiedProjectId(project.id);
+      window.setTimeout(() => {
+        setCopiedProjectId((prev) => (prev === project.id ? null : prev));
+      }, 1800);
+    } catch {
+      window.alert("Unable to copy link. Please allow clipboard access.");
     }
   };
 
@@ -602,13 +674,71 @@ export default function StudioPhotoSelectionSection() {
                 Shown as the subtitle under the project name. Optional—leave blank to use “No additional details”.
               </p>
             </div>
+
+            <div className="rounded-xl border border-zinc-200 bg-zinc-50/80 p-4">
+              <label className="flex cursor-pointer items-start gap-3">
+                <input
+                  type="checkbox"
+                  checked={newProjectPinEnabled}
+                  onChange={(e) => {
+                    setNewProjectPinEnabled(e.target.checked);
+                    if (!e.target.checked) setNewProjectPin("");
+                  }}
+                  className="mt-1 h-4 w-4 rounded border-zinc-300 text-zinc-900"
+                />
+                <span>
+                  <span className="text-sm font-semibold text-zinc-900">Require PIN for client link</span>
+                  <span className="mt-1 block text-xs text-zinc-600">
+                    Clients must enter a numeric PIN before they can view or download photos (4–8 digits).
+                  </span>
+                </span>
+              </label>
+              {newProjectPinEnabled ? (
+                <div className="mt-4">
+                  <label htmlFor="new-selection-project-pin" className="text-sm font-semibold text-zinc-900">
+                    PIN <span className="font-normal text-red-600">*</span>
+                  </label>
+                  <div className="relative mt-2">
+                    <input
+                      id="new-selection-project-pin"
+                      type={newProjectPinVisible ? "text" : "password"}
+                      inputMode="numeric"
+                      autoComplete="new-password"
+                      maxLength={8}
+                      value={newProjectPin}
+                      onChange={(e) => setNewProjectPin(e.target.value.replace(/\D/g, "").slice(0, 8))}
+                      placeholder="e.g. 4829"
+                      className="h-11 w-full rounded-xl border border-zinc-200 bg-white py-2 pl-3 pr-11 text-sm tracking-widest text-zinc-900 outline-none ring-zinc-900/10 placeholder:text-zinc-400 focus:ring-4"
+                    />
+                    <button
+                      type="button"
+                      aria-label={newProjectPinVisible ? "Hide PIN while typing" : "Show PIN while typing"}
+                      onClick={() => setNewProjectPinVisible((v) => !v)}
+                      className="absolute right-2 top-1/2 inline-flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-lg text-zinc-500 hover:bg-zinc-100 hover:text-zinc-800"
+                    >
+                      {newProjectPinVisible ? (
+                        <EyeOff className="h-4 w-4" strokeWidth={1.75} />
+                      ) : (
+                        <Eye className="h-4 w-4" strokeWidth={1.75} />
+                      )}
+                    </button>
+                  </div>
+                </div>
+              ) : null}
+            </div>
           </div>
 
           <div className="flex flex-col-reverse gap-2 border-t border-zinc-100 px-5 py-4 sm:flex-row sm:justify-end sm:gap-3">
             <GhostButton type="button" onClick={closeNewProjectModal}>
               Cancel
             </GhostButton>
-            <PrimaryButton type="button" onClick={submitNewProject} disabled={!newProjectName.trim()}>
+            <PrimaryButton
+              type="button"
+              onClick={submitNewProject}
+              disabled={
+                !newProjectName.trim() || (newProjectPinEnabled && !/^\d{4,8}$/.test(newProjectPin.trim()))
+              }
+            >
               Create & open project
             </PrimaryButton>
           </div>
@@ -751,9 +881,18 @@ export default function StudioPhotoSelectionSection() {
 
             <div className="flex flex-col-reverse gap-2 border-t border-zinc-100 px-5 py-4 sm:flex-row sm:justify-end sm:gap-3">
               {uploadModalSubmitting ? (
-                <p className="mr-auto self-center text-sm font-medium text-zinc-700">
-                  Uploading {uploadModalFiles.length} file{uploadModalFiles.length === 1 ? "" : "s"}...
-                </p>
+                <div className="mr-auto min-w-[220px] self-center">
+                  <p className="text-sm font-medium text-zinc-700">
+                    Uploading {uploadModalFiles.length} file{uploadModalFiles.length === 1 ? "" : "s"}...{" "}
+                    {uploadModalProgress}%
+                  </p>
+                  <div className="mt-1 h-1.5 w-full overflow-hidden rounded-full bg-zinc-200">
+                    <div
+                      className="h-full rounded-full bg-zinc-900 transition-[width] duration-200"
+                      style={{ width: `${uploadModalProgress}%` }}
+                    />
+                  </div>
+                </div>
               ) : null}
               <GhostButton type="button" onClick={closeUploadModal} disabled={uploadModalSubmitting}>
                 Cancel
@@ -793,7 +932,7 @@ export default function StudioPhotoSelectionSection() {
           <div className="flex flex-wrap items-center gap-2">
             {p.published ? (
               <span className="inline-flex h-10 items-center rounded-xl border border-emerald-200 bg-emerald-50 px-4 text-sm font-semibold text-emerald-900">
-                Published · client link live (UI)
+                Published
               </span>
             ) : (
               <PrimaryButton
@@ -808,8 +947,8 @@ export default function StudioPhotoSelectionSection() {
           </div>
         </div>
 
-        <div className="grid gap-4 xl:grid-cols-[320px_1fr]">
-          <aside className="space-y-4">
+        <div className="grid gap-4 xl:grid-cols-[1fr_320px]">
+          <aside className="space-y-4 xl:order-2">
             <div className="rounded-2xl border border-zinc-200/80 bg-white p-5 shadow-sm">
               <div className="flex items-start gap-2">
                 <Layers className="mt-0.5 h-5 w-5 shrink-0 text-zinc-700" strokeWidth={1.75} />
@@ -863,9 +1002,87 @@ export default function StudioPhotoSelectionSection() {
                 </PrimaryButton>
               </div>
             </div>
+
+            <div className="rounded-2xl border border-zinc-200/80 bg-white p-5 shadow-sm">
+              <div className="flex items-start gap-2">
+                <Lock className="mt-0.5 h-5 w-5 shrink-0 text-zinc-700" strokeWidth={1.75} />
+                <div className="min-w-0">
+                  <p className="text-sm font-semibold text-zinc-900">Client link PIN</p>
+                  <p className="mt-1 text-xs leading-relaxed text-zinc-600">
+                    When enabled, anyone opening the public gallery must enter this PIN.
+                  </p>
+                </div>
+              </div>
+
+              <label className="mt-4 flex cursor-pointer items-start gap-3 rounded-xl border border-zinc-100 bg-zinc-50/80 px-3 py-3">
+                <input
+                  type="checkbox"
+                  checked={pinDraftEnabled}
+                  onChange={(e) => {
+                    setPinDraftEnabled(e.target.checked);
+                    if (!e.target.checked) setPinDraftInput("");
+                    setPinSettingsMessage(null);
+                  }}
+                  className="mt-1 h-4 w-4 rounded border-zinc-300 text-zinc-900"
+                />
+                <span className="text-sm text-zinc-800">
+                  <span className="font-semibold text-zinc-900">Require PIN</span>
+                  <span className="mt-0.5 block text-xs font-normal text-zinc-600">
+                    {p.pinEnabled ? "Currently on for this project." : "Currently off."}
+                  </span>
+                </span>
+              </label>
+
+              {pinDraftEnabled ? (
+                <div className="mt-3">
+                  <label htmlFor="workspace-pin-input" className="text-xs font-semibold text-zinc-700">
+                    {p.pinEnabled ? "New PIN (to change)" : "PIN"}
+                  </label>
+                  <div className="relative mt-1.5">
+                    <input
+                      id="workspace-pin-input"
+                      type={workspacePinVisible ? "text" : "password"}
+                      inputMode="numeric"
+                      autoComplete="new-password"
+                      maxLength={8}
+                      value={pinDraftInput}
+                      onChange={(e) => setPinDraftInput(e.target.value.replace(/\D/g, "").slice(0, 8))}
+                      placeholder={p.pinEnabled ? "Enter new PIN to change" : "4–8 digits"}
+                      className="h-10 w-full rounded-xl border border-zinc-200 bg-white py-2 pl-3 pr-11 text-sm tracking-widest text-zinc-900 outline-none ring-zinc-900/10 placeholder:text-zinc-400 focus:ring-4"
+                    />
+                    <button
+                      type="button"
+                      aria-label={workspacePinVisible ? "Hide PIN while typing" : "Show PIN while typing"}
+                      onClick={() => setWorkspacePinVisible((v) => !v)}
+                      className="absolute right-1.5 top-1/2 inline-flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-lg text-zinc-500 hover:bg-zinc-100 hover:text-zinc-800"
+                    >
+                      {workspacePinVisible ? (
+                        <EyeOff className="h-4 w-4" strokeWidth={1.75} />
+                      ) : (
+                        <Eye className="h-4 w-4" strokeWidth={1.75} />
+                      )}
+                    </button>
+                  </div>
+                </div>
+              ) : null}
+
+              {pinSettingsMessage ? (
+                <p className="mt-3 text-xs font-medium text-emerald-800">{pinSettingsMessage}</p>
+              ) : null}
+
+              <div className="mt-4">
+                <PrimaryButton
+                  type="button"
+                  onClick={() => void savePinSettings()}
+                  disabled={!canSavePinSettings || pinSettingsSaving}
+                >
+                  {pinSettingsSaving ? "Saving…" : "Save PIN settings"}
+                </PrimaryButton>
+              </div>
+            </div>
           </aside>
 
-          <section className="min-w-0 space-y-4">
+          <section className="min-w-0 space-y-4 xl:order-1">
             <div className="flex flex-col gap-3 rounded-2xl border border-zinc-200/80 bg-white p-4 shadow-sm lg:flex-row lg:items-center lg:justify-between">
               <div className="flex flex-wrap items-center gap-2">
                 <button
@@ -920,15 +1137,25 @@ export default function StudioPhotoSelectionSection() {
                   <ImagePlus className="h-4 w-4" strokeWidth={1.75} />
                   Add photos
                 </button>
-                <GhostButton
+                <button
                   type="button"
-                  onClick={() => {
-                    setStudioImagePreviewId(null);
-                    setClientPreviewOpen(true);
-                  }}
+                  onClick={() => void copyClientLink(p)}
+                  disabled={!p.published}
+                  title={
+                    p.published
+                      ? "Copy public gallery URL"
+                      : "Publish the selection to copy a link"
+                  }
+                  className={[
+                    "inline-flex h-10 items-center justify-center gap-2 rounded-xl border px-4 text-sm font-semibold shadow-sm transition",
+                    p.published
+                      ? "border-zinc-200 bg-white text-zinc-900 hover:bg-zinc-50"
+                      : "cursor-not-allowed border-zinc-100 bg-zinc-50 text-zinc-400",
+                  ].join(" ")}
                 >
-                  Client preview
-                </GhostButton>
+                  <Link2 className="h-4 w-4" strokeWidth={1.75} />
+                  {copiedProjectId === p.id ? "Copied" : "Copy URL"}
+                </button>
               </div>
             </div>
 
@@ -938,7 +1165,7 @@ export default function StudioPhotoSelectionSection() {
                   <ImagePlus className="mx-auto h-10 w-10 text-zinc-400" strokeWidth={1.5} />
                   <p className="mt-4 text-sm font-semibold text-zinc-900">No photos yet</p>
                   <p className="mt-1 text-sm text-zinc-600">
-                    Upload images to build the selection grid. Everything stays in-browser for this UI preview.
+                    Upload images to build the selection grid.
                   </p>
                   <button
                     type="button"
@@ -973,12 +1200,11 @@ export default function StudioPhotoSelectionSection() {
                         type="button"
                         onClick={() => togglePick(t.id)}
                         className={[
-                          "group absolute inset-0 overflow-hidden rounded-2xl bg-gradient-to-br ring-1 ring-black/5 transition",
-                          t.kind === "sample" ? t.gradient : "from-zinc-100 to-zinc-200",
+                          "group absolute inset-0 overflow-hidden rounded-2xl bg-gradient-to-br from-zinc-100 to-zinc-200 ring-1 ring-black/5 transition",
                           t.picked ? "ring-2 ring-emerald-500/80" : "hover:ring-2 hover:ring-zinc-400/60",
                         ].join(" ")}
                       >
-                        {t.kind === "upload" && t.blobUrl ? (
+                        {t.blobUrl ? (
                           <img alt="" src={t.blobUrl} className="absolute inset-0 h-full w-full object-cover" />
                         ) : null}
                         <span className="absolute inset-0 bg-gradient-to-t from-black/35 via-black/0 to-black/10 opacity-80" />
@@ -1023,7 +1249,6 @@ export default function StudioPhotoSelectionSection() {
                   <span className="font-semibold text-zinc-900">Tip:</span> expand icon opens a large preview; tap the
                   tile to toggle picked.
                 </p>
-                <p className="font-mono text-[11px] text-zinc-500">UI mock</p>
               </div>
             </div>
           </section>
@@ -1049,19 +1274,14 @@ export default function StudioPhotoSelectionSection() {
                 </button>
               </div>
               <div className="overflow-hidden rounded-2xl bg-black ring-1 ring-white/15">
-                {studioPreviewPhoto.kind === "upload" && studioPreviewPhoto.blobUrl ? (
+                {studioPreviewPhoto.blobUrl ? (
                   <img
                     src={studioPreviewPhoto.blobUrl}
                     alt=""
                     className="mx-auto max-h-[85vh] w-auto max-w-full object-contain"
                   />
                 ) : (
-                  <div
-                    className={[
-                      "mx-auto flex min-h-[min(50vh,360px)] w-full max-w-full items-center justify-center bg-gradient-to-br sm:min-h-[min(65vh,520px)]",
-                      studioPreviewPhoto.gradient ?? "",
-                    ].join(" ")}
-                  />
+                  <div className="mx-auto flex min-h-[min(50vh,360px)] w-full max-w-full items-center justify-center bg-zinc-800 sm:min-h-[min(65vh,520px)]" />
                 )}
               </div>
               <p className="text-center text-sm font-medium text-white">{studioPreviewPhoto.label}</p>
@@ -1090,22 +1310,6 @@ export default function StudioPhotoSelectionSection() {
           </div>
         ) : null}
         {uploadPhotoModal}
-        {clientPreviewOpen ? (
-          <ClientSelectionPreview
-            key={p.id}
-            studioName={STUDIO_DISPLAY_NAME}
-            projectName={p.name}
-            subtitle={p.subtitle}
-            pickedCount={pickedCount}
-            photoCount={p.photos.length}
-            published={p.published}
-            clientTabs={p.clientPreviewTabs}
-            photos={p.photos}
-            onClose={() => setClientPreviewOpen(false)}
-            onTogglePick={togglePick}
-            onToggleFav={toggleFav}
-          />
-        ) : null}
       </>
     );
   }
@@ -1134,7 +1338,11 @@ export default function StudioPhotoSelectionSection() {
             </span>
             <div>
               <h2 className="text-sm font-semibold text-zinc-900">Selection projects</h2>
-              <p className="text-sm text-zinc-600">{projects.length} projects · open one to upload and cull</p>
+              <p className="text-sm text-zinc-600">
+                {projectsLoading
+                  ? "Loading…"
+                  : `${projects.length} projects · open one to upload and cull`}
+              </p>
             </div>
           </div>
         </div>
@@ -1146,44 +1354,92 @@ export default function StudioPhotoSelectionSection() {
               <tr>
                 <th className="px-5 py-3">Project</th>
                 <th className="px-5 py-3">Photos</th>
-                <th className="px-5 py-3">Goal</th>
                 <th className="px-5 py-3">Status</th>
+                <th className="px-5 py-3 text-right">Copy link</th>
                 <th className="px-5 py-3 text-right">Open</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-zinc-100">
-              {projects.map((proj) => {
-                const picks = proj.photos.filter((ph) => ph.picked).length;
-                return (
-                  <tr key={proj.id} className="bg-white">
+              {projectsLoading ? (
+                Array.from({ length: 5 }, (_, i) => (
+                  <tr key={`shimmer-${i}`} className="bg-white">
                     <td className="px-5 py-3">
-                      <p className="font-semibold text-zinc-900">{proj.name}</p>
-                      {proj.subtitle.trim() ? (
-                        <p className="mt-0.5 text-xs text-zinc-600">{proj.subtitle}</p>
-                      ) : null}
-                    </td>
-                    <td className="px-5 py-3 text-zinc-700">{proj.photos.length.toLocaleString()}</td>
-                    <td className="px-5 py-3 text-zinc-700">
-                      {picks} / {proj.goal} picks
+                      <div className={`h-4 max-w-[180px] rounded-md ${STUDIO_TABLE_SHIMMER}`} />
+                      <div className={`mt-2 h-3 max-w-[120px] rounded-md ${STUDIO_TABLE_SHIMMER}`} />
                     </td>
                     <td className="px-5 py-3">
-                      <StatusBadge tone={proj.published ? "good" : toneForRound(proj.round.tone)}>
-                        {proj.published ? "Published" : proj.round.label}
-                      </StatusBadge>
+                      <div className={`h-4 w-10 rounded-md ${STUDIO_TABLE_SHIMMER}`} />
+                    </td>
+                    <td className="px-5 py-3">
+                      <div className={`h-6 w-20 rounded-full ${STUDIO_TABLE_SHIMMER}`} />
                     </td>
                     <td className="px-5 py-3 text-right">
-                      <button
-                        type="button"
-                        onClick={() => setActiveProjectId(proj.id)}
-                        className="inline-flex items-center gap-1 rounded-lg px-2 py-1.5 text-sm font-semibold text-zinc-900 hover:bg-zinc-100"
-                      >
-                        Open
-                        <ChevronRight className="h-4 w-4" strokeWidth={2} />
-                      </button>
+                      <div className={`ml-auto h-8 w-20 rounded-lg ${STUDIO_TABLE_SHIMMER}`} />
+                    </td>
+                    <td className="px-5 py-3 text-right">
+                      <div className={`ml-auto h-8 w-16 rounded-lg ${STUDIO_TABLE_SHIMMER}`} />
                     </td>
                   </tr>
-                );
-              })}
+                ))
+              ) : projects.length === 0 ? (
+                <tr className="bg-white">
+                  <td colSpan={5} className="px-5 py-10 text-center text-sm text-zinc-600">
+                    No selection projects yet. Create one to get started.
+                  </td>
+                </tr>
+              ) : (
+                projects.map((proj) => {
+                  const canCopy = Boolean(proj.published);
+                  return (
+                    <tr key={proj.id} className="bg-white">
+                      <td className="px-5 py-3">
+                        <p className="font-semibold text-zinc-900">{proj.name}</p>
+                        {proj.subtitle.trim() ? (
+                          <p className="mt-0.5 text-xs text-zinc-600">{proj.subtitle}</p>
+                        ) : null}
+                      </td>
+                      <td className="px-5 py-3 text-zinc-700">{proj.photos.length.toLocaleString()}</td>
+                      <td className="px-5 py-3">
+                        <StatusBadge tone={proj.published ? "good" : toneForRound(proj.round.tone)}>
+                          {proj.published ? "Published" : proj.round.label}
+                        </StatusBadge>
+                      </td>
+                      <td className="px-5 py-3 text-right">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            void copyClientLink(proj);
+                          }}
+                          disabled={!canCopy}
+                          title={
+                            canCopy
+                              ? "Copy client link"
+                              : "Publish the selection to generate a shareable link"
+                          }
+                          className={[
+                            "inline-flex items-center gap-1 rounded-lg px-2 py-1.5 text-sm font-semibold",
+                            canCopy
+                              ? "text-zinc-900 hover:bg-zinc-100"
+                              : "cursor-not-allowed text-zinc-400",
+                          ].join(" ")}
+                        >
+                          {copiedProjectId === proj.id ? "Copied" : "Copy link"}
+                        </button>
+                      </td>
+                      <td className="px-5 py-3 text-right">
+                        <button
+                          type="button"
+                          onClick={() => setActiveProjectId(proj.id)}
+                          className="inline-flex items-center gap-1 rounded-lg px-2 py-1.5 text-sm font-semibold text-zinc-900 hover:bg-zinc-100"
+                        >
+                          Open
+                          <ChevronRight className="h-4 w-4" strokeWidth={2} />
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })
+              )}
             </tbody>
           </table>
         </div>

@@ -43,6 +43,9 @@ const photoSelectionSchema = new mongoose.Schema(
     photos: { type: [photoSelectionPhotoSchema], default: [] },
     published: { type: Boolean, default: false },
     publishedAt: { type: Date, default: null },
+    /** When true, public `/photos/{slug}` (and share link) require PIN + short-lived access token. */
+    pinEnabled: { type: Boolean, default: false },
+    pinHash: { type: String, default: "" },
   },
   { _id: false }
 );
@@ -61,11 +64,20 @@ const projectSchema = new mongoose.Schema(
     images: { type: [clientProjectImageSchema], default: [] },
     photoSelection: { type: photoSelectionSchema, default: () => ({}) },
     isPublished: { type: Boolean, default: false, index: true },
-    slug: { type: String, default: null, unique: true, sparse: true, index: true },
-    shareToken: { type: String, default: null, unique: true, sparse: true, index: true },
+    slug: { type: String, default: undefined, unique: true, sparse: true, index: true },
+    shareToken: { type: String, default: undefined, unique: true, sparse: true, index: true },
   },
   { timestamps: true }
 );
+
+projectSchema.set("toJSON", {
+  transform(_doc, ret) {
+    if (ret.photoSelection && typeof ret.photoSelection === "object" && "pinHash" in ret.photoSelection) {
+      delete ret.photoSelection.pinHash;
+    }
+    return ret;
+  },
+});
 
 module.exports = mongoose.model("Project", projectSchema);
 

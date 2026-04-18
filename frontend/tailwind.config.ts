@@ -44,6 +44,10 @@ export default {
           '0%': { transform: 'translateX(0)' },
           '100%': { transform: 'translateX(-50%)' },
         },
+        shimmer: {
+          '0%': { backgroundPosition: '200% 0' },
+          '100%': { backgroundPosition: '-200% 0' },
+        },
       },
       animation: {
         'float-slow': 'float 6s ease-in-out infinite',
@@ -51,6 +55,7 @@ export default {
         'float-fast': 'float 3s ease-in-out infinite',
         'spin-slow': 'spin-slow 8s linear infinite',
         'scroll-left': 'scroll-left 45s linear infinite',
+        shimmer: 'shimmer 1.8s ease-in-out infinite',
       },
     },
   },

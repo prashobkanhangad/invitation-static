@@ -3,8 +3,8 @@ import {
   Globe2,
   Heart,
   Image as ImageIcon,
-  LayoutDashboard,
   Settings,
+  UserCircle,
   Users,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
@@ -16,14 +16,29 @@ export type StudioNavItem = {
   icon: LucideIcon;
 };
 
+export type StudioUserRole = "master_admin" | "studio";
+
 export const STUDIO_OVERVIEW_HREF = "/studio/dashboard";
 
 export const studioNavItems: StudioNavItem[] = [
+  // Overview — hidden while dashboard home overview is disabled (`app/studio/dashboard/page.tsx`).
+  // {
+  //   href: STUDIO_OVERVIEW_HREF,
+  //   label: "Overview",
+  //   description: "KPIs and shortcuts",
+  //   icon: LayoutDashboard,
+  // },
   {
-    href: STUDIO_OVERVIEW_HREF,
-    label: "Overview",
-    description: "KPIs and shortcuts",
-    icon: LayoutDashboard,
+    href: "/studio/dashboard/selection",
+    label: "Photo selection",
+    description: "Culls from raw footage",
+    icon: ImageIcon,
+  },
+  {
+    href: "/studio/dashboard/albums",
+    label: "Digital albums",
+    description: "Deliverable galleries",
+    icon: BookOpen,
   },
   {
     href: "/studio/dashboard/studio-site",
@@ -38,16 +53,10 @@ export const studioNavItems: StudioNavItem[] = [
     icon: Heart,
   },
   {
-    href: "/studio/dashboard/albums",
-    label: "Digital albums",
-    description: "Deliverable galleries",
-    icon: BookOpen,
-  },
-  {
-    href: "/studio/dashboard/selection",
-    label: "Photo selection",
-    description: "Culls from raw footage",
-    icon: ImageIcon,
+    href: "/studio/dashboard/account",
+    label: "Account",
+    description: "Studio name, profile, and sign-in",
+    icon: UserCircle,
   },
   {
     href: "/studio/dashboard/users",
@@ -62,3 +71,12 @@ export const studioNavItems: StudioNavItem[] = [
     icon: Settings,
   },
 ];
+
+export function getStudioNavItemsByRole(role: StudioUserRole | null | undefined): StudioNavItem[] {
+  if (role === "master_admin") return studioNavItems;
+  return studioNavItems.filter(
+    (item) =>
+      item.href !== "/studio/dashboard/users" &&
+      item.href !== "/studio/dashboard/settings"
+  );
+}

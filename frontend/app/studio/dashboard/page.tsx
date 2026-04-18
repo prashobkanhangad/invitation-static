@@ -1,6 +1,13 @@
+"use client";
+
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { ArrowRight, ExternalLink } from "lucide-react";
-import { studioNavItems, STUDIO_OVERVIEW_HREF } from "@/components/studio-dashboard/nav";
+import {
+  getStudioNavItemsByRole,
+  STUDIO_OVERVIEW_HREF,
+  type StudioUserRole,
+} from "@/components/studio-dashboard/nav";
 import { GhostButton, PageHeader, PrimaryButton, StatCard, StatusBadge } from "@/components/studio-dashboard/blocks";
 
 const recentActivity = [
@@ -43,10 +50,31 @@ const recentActivity = [
 ];
 
 export default function StudioDashboardOverviewPage() {
-  const modules = studioNavItems.filter((i) => i.href !== STUDIO_OVERVIEW_HREF);
+  const [userRole, setUserRole] = useState<StudioUserRole | null>(null);
+
+  useEffect(() => {
+    try {
+      const rawUser = window.localStorage.getItem("studio_user");
+      const user = rawUser ? JSON.parse(rawUser) : null;
+      const role = user?.role;
+      setUserRole(role === "master_admin" ? "master_admin" : "studio");
+    } catch {
+      setUserRole("studio");
+    }
+  }, []);
+
+  const modules = useMemo(
+    () => getStudioNavItemsByRole(userRole).filter((i) => i.href !== STUDIO_OVERVIEW_HREF),
+    [userRole]
+  );
+
+  /* Overview marketing/KPI section — disabled; set to true to restore. */
+  const showOverviewSection = false;
 
   return (
     <>
+      {showOverviewSection ? (
+        <>
       <PageHeader
         eyebrow="Operations"
         title="Run your studio like a product"
@@ -225,6 +253,8 @@ export default function StudioDashboardOverviewPage() {
           </table>
         </div>
       </section>
+        </>
+      ) : null}
     </>
   );
 }

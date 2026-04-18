@@ -1,7 +1,21 @@
 const crypto = require("crypto");
+const sharp = require("sharp");
 const Album = require("../models/Album");
-const { uploadImageVariantsByProvider } = require("./storageUploader");
+const {
+  uploadImageVariantsByProvider,
+  downloadObjectBuffer,
+  deleteObjectAtKey,
+  createDirectUploadWriteUrl,
+  safeName,
+} = require("./storageUploader");
 const { getActiveStorageProvider } = require("./storageSettings");
+
+const MAX_DIRECT_FILE_BYTES = 100 * 1024 * 1024;
+const MAX_DIRECT_FILES_PER_BATCH = 120;
+
+function stagingPrefixAlbum(userId, albumMongoId) {
+  return `studio/${String(userId)}/albums/${String(albumMongoId)}/raw`;
+}
 
 function normalizeSlug(input) {
   if (!input || typeof input !== "string") return "";
@@ -45,11 +59,43 @@ async function getAlbum(user, albumId) {
   return { album };
 }
 
+function clampBannerPositionString(v) {
+  if (typeof v !== "string") return null;
+  const t = v.trim();
+  if (!t) return null;
+  if (t.length > 48) return null;
+  return t;
+}
+
 async function updateAlbum(user, albumId, payload) {
   const album = await getStudioAlbum(user, albumId);
   if (!album) return { error: { status: 404, message: "Album not found" } };
-  const { title, galleryTabs } = payload || {};
-  if (typeof title === "string" && title.trim()) album.title = title.trim();
+  const { title, galleryTabs, bannerHeroDesktopPosition, bannerHeroMobilePosition } = payload || {};
+  let titleChanged = false;
+  if (typeof title === "string" && title.trim()) {
+    const nextTitle = title.trim();
+    if (nextTitle !== album.title) titleChanged = true;
+    album.title = nextTitle;
+  }
+  if (titleChanged) {
+    let nextSlug = normalizeSlug(album.title);
+    if (!nextSlug) nextSlug = `a_${crypto.randomBytes(3).toString("hex")}`;
+    const slugTaken = await Album.findOne({ slug: nextSlug, _id: { $ne: album._id } });
+    if (slugTaken) {
+      return {
+        error: {
+          status: 409,
+          message:
+            "That title maps to a URL already used by another album. Change the name slightly (the public link uses this URL).",
+        },
+      };
+    }
+    album.slug = nextSlug;
+  }
+  const d = clampBannerPositionString(bannerHeroDesktopPosition);
+  if (d !== null) album.bannerHeroDesktopPosition = d;
+  const m = clampBannerPositionString(bannerHeroMobilePosition);
+  if (m !== null) album.bannerHeroMobilePosition = m;
   if (Array.isArray(galleryTabs)) {
     album.galleryTabs = galleryTabs
       .filter((t) => t && typeof t.id === "string")
@@ -209,13 +255,259 @@ async function deleteImage(user, albumId, imageId) {
   return { ok: true };
 }
 
+async function prepareBannerDirectUpload(user, albumId, payload) {
+  const album = await getStudioAlbum(user, albumId);
+  if (!album) return { error: { status: 404, message: "Album not found" } };
+  const meta = payload?.file;
+  const originalName = typeof meta?.originalName === "string" ? meta.originalName : "banner.jpg";
+  const mimeType = typeof meta?.mimeType === "string" ? meta.mimeType : "image/jpeg";
+  const byteSize = Number(meta?.byteSize);
+  if (!mimeType.startsWith("image/")) return { error: { status: 400, message: "Banner must be an image" } };
+  if (!Number.isFinite(byteSize) || byteSize <= 0 || byteSize > MAX_DIRECT_FILE_BYTES) {
+    return { error: { status: 400, message: "Invalid banner file size (max 100MB)" } };
+  }
+  const provider = await getActiveStorageProvider();
+  const prefix = stagingPrefixAlbum(user.id, album._id);
+  const key = `${prefix}/banner_${crypto.randomBytes(12).toString("hex")}_${safeName(originalName)}`;
+  const { uploadUrl, method, headers } = await createDirectUploadWriteUrl({
+    key,
+    contentType: mimeType,
+    provider,
+  });
+  return {
+    upload: {
+      key,
+      originalName,
+      mimeType,
+      byteSize,
+      uploadUrl,
+      method,
+      headers,
+    },
+    expiresInSeconds: 1200,
+  };
+}
+
+async function commitBannerDirectUpload(user, albumId, payload) {
+  const album = await getStudioAlbum(user, albumId);
+  if (!album) return { error: { status: 404, message: "Album not found" } };
+  const key = typeof payload?.key === "string" ? payload.key : "";
+  const originalName = typeof payload?.originalName === "string" ? payload.originalName : "banner.jpg";
+  const mimeType = typeof payload?.mimeType === "string" ? payload.mimeType : "image/jpeg";
+  const expectedPrefix = stagingPrefixAlbum(user.id, album._id);
+  if (!key || !key.startsWith(`${expectedPrefix}/`)) {
+    return { error: { status: 400, message: "Invalid storage key" } };
+  }
+  const provider = await getActiveStorageProvider();
+  const folder = `albums/${String(user.id || "unknown-user")}/${String(album._id)}`;
+  let buffer;
+  try {
+    buffer = await downloadObjectBuffer({ key, provider });
+  } catch {
+    return { error: { status: 400, message: "Could not read uploaded banner" } };
+  }
+  try {
+    await sharp(buffer).metadata();
+  } catch {
+    await deleteObjectAtKey({ key, provider }).catch(() => {});
+    return { error: { status: 400, message: "Not a valid image" } };
+  }
+  const file = { buffer, originalname: originalName, mimetype: mimeType };
+  const { originalUrl, displayUrl, thumbUrl } = await uploadImageVariantsByProvider({
+    file,
+    folder,
+    provider,
+  });
+  await deleteObjectAtKey({ key, provider }).catch(() => {});
+  album.bannerImage = {
+    id: `bn_${Date.now()}_${Math.random().toString(16).slice(2)}`,
+    url: displayUrl,
+    originalUrl,
+    thumbUrl,
+    originalName,
+    mimeType,
+    order: 0,
+  };
+  await album.save();
+  return { bannerImage: album.bannerImage };
+}
+
+async function prepareHighlightsDirectUploads(user, albumId, payload) {
+  const album = await getStudioAlbum(user, albumId);
+  if (!album) return { error: { status: 404, message: "Album not found" } };
+  const files = Array.isArray(payload?.files) ? payload.files : [];
+  if (files.length === 0) return { error: { status: 400, message: "No files requested" } };
+  if (files.length > MAX_DIRECT_FILES_PER_BATCH) {
+    return { error: { status: 400, message: `Maximum ${MAX_DIRECT_FILES_PER_BATCH} files per batch` } };
+  }
+  const provider = await getActiveStorageProvider();
+  const prefix = stagingPrefixAlbum(user.id, album._id);
+  const uploads = [];
+  for (const meta of files) {
+    const originalName = typeof meta?.originalName === "string" ? meta.originalName : "image.jpg";
+    const mimeType = typeof meta?.mimeType === "string" ? meta.mimeType : "application/octet-stream";
+    const byteSize = Number(meta?.byteSize);
+    if (!mimeType.startsWith("image/")) {
+      return { error: { status: 400, message: `Not an image: ${originalName}` } };
+    }
+    if (!Number.isFinite(byteSize) || byteSize <= 0 || byteSize > MAX_DIRECT_FILE_BYTES) {
+      return { error: { status: 400, message: `Invalid size: ${originalName}` } };
+    }
+    const key = `${prefix}/hl_${crypto.randomBytes(10).toString("hex")}_${safeName(originalName)}`;
+    const { uploadUrl, method, headers } = await createDirectUploadWriteUrl({
+      key,
+      contentType: mimeType,
+      provider,
+    });
+    uploads.push({ key, originalName, mimeType, byteSize, uploadUrl, method, headers });
+  }
+  return { uploads, expiresInSeconds: 1200 };
+}
+
+async function commitHighlightsDirectUploads(user, albumId, payload) {
+  const album = await getStudioAlbum(user, albumId);
+  if (!album) return { error: { status: 404, message: "Album not found" } };
+  const items = Array.isArray(payload?.items) ? payload.items : [];
+  if (items.length === 0) return { error: { status: 400, message: "No items to commit" } };
+  const provider = await getActiveStorageProvider();
+  const folder = `albums/${String(user.id || "unknown-user")}/${String(album._id)}`;
+  const expectedPrefix = stagingPrefixAlbum(user.id, album._id);
+  const start = album.highlights.length;
+  const added = [];
+  for (let i = 0; i < items.length; i += 1) {
+    const item = items[i];
+    const key = typeof item?.key === "string" ? item.key : "";
+    const originalName = typeof item?.originalName === "string" ? item.originalName : "image.jpg";
+    const mimeType = typeof item?.mimeType === "string" ? item.mimeType : "image/jpeg";
+    if (!key || !key.startsWith(`${expectedPrefix}/`)) {
+      return { error: { status: 400, message: "Invalid storage key" } };
+    }
+    let buffer;
+    try {
+      buffer = await downloadObjectBuffer({ key, provider });
+    } catch {
+      return { error: { status: 400, message: `Could not read: ${originalName}` } };
+    }
+    try {
+      await sharp(buffer).metadata();
+    } catch {
+      await deleteObjectAtKey({ key, provider }).catch(() => {});
+      return { error: { status: 400, message: `Invalid image: ${originalName}` } };
+    }
+    const file = { buffer, originalname: originalName, mimetype: mimeType };
+    const { originalUrl, displayUrl, thumbUrl } = await uploadImageVariantsByProvider({
+      file,
+      folder,
+      provider,
+    });
+    await deleteObjectAtKey({ key, provider }).catch(() => {});
+    added.push({
+      id: `hl_${Date.now()}_${Math.random().toString(16).slice(2)}`,
+      url: displayUrl,
+      originalUrl,
+      thumbUrl,
+      originalName,
+      mimeType,
+      order: start + i,
+    });
+  }
+  album.highlights = [...album.highlights, ...added];
+  await album.save();
+  return { highlights: added };
+}
+
+async function prepareGalleryTabDirectUploads(user, albumId, tabId, payload) {
+  const album = await getStudioAlbum(user, albumId);
+  if (!album) return { error: { status: 404, message: "Album not found" } };
+  const tab = album.galleryTabs.find((t) => t.id === tabId);
+  if (!tab) return { error: { status: 404, message: "Tab not found" } };
+  const files = Array.isArray(payload?.files) ? payload.files : [];
+  if (files.length === 0) return { error: { status: 400, message: "No files requested" } };
+  if (files.length > MAX_DIRECT_FILES_PER_BATCH) {
+    return { error: { status: 400, message: `Maximum ${MAX_DIRECT_FILES_PER_BATCH} files per batch` } };
+  }
+  const provider = await getActiveStorageProvider();
+  const prefix = stagingPrefixAlbum(user.id, album._id);
+  const uploads = [];
+  for (const meta of files) {
+    const originalName = typeof meta?.originalName === "string" ? meta.originalName : "image.jpg";
+    const mimeType = typeof meta?.mimeType === "string" ? meta.mimeType : "application/octet-stream";
+    const byteSize = Number(meta?.byteSize);
+    if (!mimeType.startsWith("image/")) {
+      return { error: { status: 400, message: `Not an image: ${originalName}` } };
+    }
+    if (!Number.isFinite(byteSize) || byteSize <= 0 || byteSize > MAX_DIRECT_FILE_BYTES) {
+      return { error: { status: 400, message: `Invalid size: ${originalName}` } };
+    }
+    const key = `${prefix}/gt_${tabId}_${crypto.randomBytes(8).toString("hex")}_${safeName(originalName)}`;
+    const { uploadUrl, method, headers } = await createDirectUploadWriteUrl({
+      key,
+      contentType: mimeType,
+      provider,
+    });
+    uploads.push({ key, originalName, mimeType, byteSize, uploadUrl, method, headers });
+  }
+  return { uploads, expiresInSeconds: 1200 };
+}
+
+async function commitGalleryTabDirectUploads(user, albumId, tabId, payload) {
+  const album = await getStudioAlbum(user, albumId);
+  if (!album) return { error: { status: 404, message: "Album not found" } };
+  const tab = album.galleryTabs.find((t) => t.id === tabId);
+  if (!tab) return { error: { status: 404, message: "Tab not found" } };
+  const items = Array.isArray(payload?.items) ? payload.items : [];
+  if (items.length === 0) return { error: { status: 400, message: "No items to commit" } };
+  const provider = await getActiveStorageProvider();
+  const folder = `albums/${String(user.id || "unknown-user")}/${String(album._id)}`;
+  const expectedPrefix = stagingPrefixAlbum(user.id, album._id);
+  const start = tab.images.length;
+  const added = [];
+  for (let i = 0; i < items.length; i += 1) {
+    const item = items[i];
+    const key = typeof item?.key === "string" ? item.key : "";
+    const originalName = typeof item?.originalName === "string" ? item.originalName : "image.jpg";
+    const mimeType = typeof item?.mimeType === "string" ? item.mimeType : "image/jpeg";
+    if (!key || !key.startsWith(`${expectedPrefix}/`) || !key.includes(`gt_${tabId}_`)) {
+      return { error: { status: 400, message: "Invalid storage key" } };
+    }
+    let buffer;
+    try {
+      buffer = await downloadObjectBuffer({ key, provider });
+    } catch {
+      return { error: { status: 400, message: `Could not read: ${originalName}` } };
+    }
+    try {
+      await sharp(buffer).metadata();
+    } catch {
+      await deleteObjectAtKey({ key, provider }).catch(() => {});
+      return { error: { status: 400, message: `Invalid image: ${originalName}` } };
+    }
+    const file = { buffer, originalname: originalName, mimetype: mimeType };
+    const { originalUrl, displayUrl, thumbUrl } = await uploadImageVariantsByProvider({
+      file,
+      folder,
+      provider,
+    });
+    await deleteObjectAtKey({ key, provider }).catch(() => {});
+    added.push({
+      id: `gi_${Date.now()}_${Math.random().toString(16).slice(2)}`,
+      url: displayUrl,
+      originalUrl,
+      thumbUrl,
+      originalName,
+      mimeType,
+      order: start + i,
+    });
+  }
+  tab.images = [...tab.images, ...added];
+  await album.save();
+  return { images: added };
+}
+
 async function publishAlbum(user, albumId, payload) {
   const album = await getStudioAlbum(user, albumId);
   if (!album) return { error: { status: 404, message: "Album not found" } };
   if (!album.bannerImage) return { error: { status: 400, message: "Banner image is required" } };
-  if (!album.highlights.length) {
-    return { error: { status: 400, message: "At least one highlight image is required" } };
-  }
   if (!album.galleryTabs.some((t) => t.images.length > 0)) {
     return { error: { status: 400, message: "At least one gallery tab with images is required" } };
   }
@@ -246,11 +538,17 @@ module.exports = {
   getAlbum,
   updateAlbum,
   uploadBanner,
+  prepareBannerDirectUpload,
+  commitBannerDirectUpload,
   uploadHighlights,
+  prepareHighlightsDirectUploads,
+  commitHighlightsDirectUploads,
   createGalleryTab,
   updateGalleryTab,
   deleteGalleryTab,
   uploadTabImages,
+  prepareGalleryTabDirectUploads,
+  commitGalleryTabDirectUploads,
   deleteImage,
   publishAlbum,
 };

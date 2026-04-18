@@ -174,4 +174,14 @@ body::before {
       rgba(107, 68, 35, 0.5) 100%
     );
   }
+
+  /* Public album hero: responsive background-position (studio-tuned laptop vs mobile) */
+  .public-album-hero {
+    background-position: var(--banner-hero-mobile-pos, 50% 50%);
+  }
+  @media (min-width: 768px) {
+    .public-album-hero {
+      background-position: var(--banner-hero-desktop-pos, 50% 50%);
+    }
+  }
 }

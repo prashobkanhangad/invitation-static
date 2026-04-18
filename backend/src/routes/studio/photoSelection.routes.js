@@ -9,6 +9,14 @@ router.post("/projects", studioPhotoSelectionController.createProject);
 router.get("/projects", studioPhotoSelectionController.listProjects);
 router.get("/projects/:projectId", studioPhotoSelectionController.getProject);
 router.patch("/projects/:projectId", studioPhotoSelectionController.updateProject);
+router.post(
+  "/projects/:projectId/photos/direct-upload/prepare",
+  studioPhotoSelectionController.preparePhotoDirectUpload
+);
+router.post(
+  "/projects/:projectId/photos/direct-upload/commit",
+  studioPhotoSelectionController.commitPhotoDirectUpload
+);
 router.post("/projects/:projectId/photos", uploadMemory.array("images", 300), studioPhotoSelectionController.uploadPhotos);
 router.patch("/projects/:projectId/photos/:photoId", studioPhotoSelectionController.updatePhoto);
 router.post("/projects/:projectId/publish", studioPhotoSelectionController.publishProject);

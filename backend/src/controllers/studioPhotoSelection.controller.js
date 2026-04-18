@@ -47,6 +47,30 @@ async function uploadPhotos(req, res) {
   }
 }
 
+async function preparePhotoDirectUpload(req, res) {
+  try {
+    const result = await studioPhotoSelectionService.preparePhotoDirectUploads(req.user, req.params.projectId, req.body);
+    if (result.error) return res.status(result.error.status).json({ message: result.error.message });
+    return res.json(result);
+  } catch (err) {
+    // eslint-disable-next-line no-console
+    console.error(err);
+    return res.status(500).json({ message: err.message || "Server error" });
+  }
+}
+
+async function commitPhotoDirectUpload(req, res) {
+  try {
+    const result = await studioPhotoSelectionService.commitPhotoDirectUploads(req.user, req.params.projectId, req.body);
+    if (result.error) return res.status(result.error.status).json({ message: result.error.message });
+    return res.status(201).json(result);
+  } catch (err) {
+    // eslint-disable-next-line no-console
+    console.error(err);
+    return res.status(500).json({ message: err.message || "Server error" });
+  }
+}
+
 async function updatePhoto(req, res) {
   const result = await studioPhotoSelectionService.updatePhoto(
     req.user,
@@ -70,6 +94,8 @@ module.exports = {
   getProject,
   updateProject,
   uploadPhotos,
+  preparePhotoDirectUpload,
+  commitPhotoDirectUpload,
   updatePhoto,
   publishProject,
 };

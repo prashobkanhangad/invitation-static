@@ -39,7 +39,7 @@ async function createUser(payload) {
 }
 
 async function updateUser(userId, payload) {
-  const { name, studioName, role, isActive } = payload || {};
+  const { name, studioName, role, isActive, password } = payload || {};
   const user = await User.findById(userId);
   if (!user) return { error: { status: 404, message: "User not found" } };
 
@@ -47,6 +47,17 @@ async function updateUser(userId, payload) {
   if (typeof studioName === "string") user.studioName = studioName;
   if (role === "master_admin" || role === "studio") user.role = role;
   if (typeof isActive === "boolean") user.isActive = isActive;
+
+  if (password !== undefined && password !== null) {
+    const p = typeof password === "string" ? password.trim() : "";
+    if (p.length > 0) {
+      if (p.length < 6) {
+        return { error: { status: 400, message: "Password must be at least 6 characters" } };
+      }
+      user.passwordHash = await bcrypt.hash(p, 10);
+    }
+  }
+
   await user.save();
   return { user: serializeUser(user) };
 }
