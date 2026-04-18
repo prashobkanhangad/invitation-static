@@ -21,11 +21,20 @@ const studioAccountRoutes = require("./routes/studio/account.routes");
 const app = express();
 
 const PORT = process.env.PORT || 5001;
+const allowedOrigins = String(process.env.CORS_ORIGIN)
+  .split(",")
+  .map((o) => o.trim())
+  .filter(Boolean);
 
 // Middleware
 app.use(
   cors({
-    origin: process.env.CORS_ORIGIN || "http://localhost:3000",
+    origin(origin, callback) {
+      // Allow server-to-server requests and tools without an Origin header.
+      if (!origin) return callback(null, true);
+      if (allowedOrigins.includes(origin)) return callback(null, true);
+      return callback(new Error("CORS blocked for this origin"));
+    },
     credentials: false,
   })
 );
