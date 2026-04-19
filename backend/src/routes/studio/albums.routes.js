@@ -29,5 +29,6 @@ router.post(
 router.post("/:albumId/gallery-tabs/:tabId/images", uploadMemory.array("images", 50), studioAlbumsController.uploadTabImages);
 router.delete("/:albumId/images/:imageId", studioAlbumsController.deleteImage);
 router.post("/:albumId/publish", studioAlbumsController.publishAlbum);
+router.delete("/:albumId", studioAlbumsController.deleteAlbum);
 
 module.exports = router;

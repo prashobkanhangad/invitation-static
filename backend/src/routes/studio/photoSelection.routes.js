@@ -20,5 +20,6 @@ router.post(
 router.post("/projects/:projectId/photos", uploadMemory.array("images", 300), studioPhotoSelectionController.uploadPhotos);
 router.patch("/projects/:projectId/photos/:photoId", studioPhotoSelectionController.updatePhoto);
 router.post("/projects/:projectId/publish", studioPhotoSelectionController.publishProject);
+router.delete("/projects/:projectId", studioPhotoSelectionController.deletePhotoSelectionProject);
 
 module.exports = router;

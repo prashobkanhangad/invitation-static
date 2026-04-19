@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useId, useState } from "react";
-import { BookOpen, ChevronRight, Monitor, Pencil, Plus, Smartphone, Upload, X } from "lucide-react";
+import { ArrowLeft, BookOpen, ChevronRight, Monitor, Pencil, Plus, Smartphone, Trash2, Upload, X } from "lucide-react";
 import {
   type DigitalAlbumTemplateId,
   DEFAULT_DIGITAL_ALBUM_TEMPLATE_ID,
@@ -112,6 +112,7 @@ export default function StudioAlbumsSection() {
   const [editTitle, setEditTitle] = useState("");
   const [editDetailLoading, setEditDetailLoading] = useState(false);
   const [editSaving, setEditSaving] = useState(false);
+  const [editPublishSubmitting, setEditPublishSubmitting] = useState(false);
   /** Full album from GET /api/studio/albums/:id while editing */
   const [editDetailAlbum, setEditDetailAlbum] = useState<any | null>(null);
   const [editBannerFile, setEditBannerFile] = useState<File | null>(null);
@@ -545,56 +546,100 @@ export default function StudioAlbumsSection() {
     }
   };
 
+  const editModalBusy = editSaving || editPublishSubmitting;
+
+  /** PATCH title/banner position, then upload any staged banner, highlights, and gallery files. Returns latest album from GET. */
+  const flushEditChangesToServer = async (): Promise<any> => {
+    if (!editingAlbum || !editTitle.trim()) {
+      throw new Error("Album name is required");
+    }
+    await studioApiFetch(`/api/studio/albums/${editingAlbum.id}`, {
+      method: "PATCH",
+      body: {
+        title: editTitle.trim(),
+        bannerHeroDesktopPosition: `${Math.round(editBannerDeskX)}% ${Math.round(editBannerDeskY)}%`,
+        bannerHeroMobilePosition: `${Math.round(editBannerMobX)}% ${Math.round(editBannerMobY)}%`,
+      },
+    });
+
+    if (editBannerFile) {
+      await uploadAlbumBannerDirect({
+        albumId: editingAlbum.id,
+        file: editBannerFile,
+        api: studioApiFetch,
+        onProgress: () => {},
+      });
+    }
+
+    if (editNewHighlightFiles.length > 0) {
+      await uploadAlbumHighlightsDirect({
+        albumId: editingAlbum.id,
+        files: editNewHighlightFiles,
+        api: studioApiFetch,
+        onProgress: () => {},
+      });
+    }
+
+    const pendingTabs = Object.entries(editPendingGalleryByTab).filter(([, files]) => files.length > 0);
+    for (const [tabId, files] of pendingTabs) {
+      await uploadAlbumGalleryTabDirect({
+        albumId: editingAlbum.id,
+        tabId,
+        files,
+        api: studioApiFetch,
+        onProgress: () => {},
+      });
+    }
+
+    const refreshed = await studioApiFetch<{ album: any }>(`/api/studio/albums/${editingAlbum.id}`);
+    return refreshed.album;
+  };
+
   const saveEdit = async () => {
     if (!editingAlbum || !editTitle.trim()) return;
     setEditSaving(true);
     try {
-      await studioApiFetch(`/api/studio/albums/${editingAlbum.id}`, {
-        method: "PATCH",
-        body: {
-          title: editTitle.trim(),
-          bannerHeroDesktopPosition: `${Math.round(editBannerDeskX)}% ${Math.round(editBannerDeskY)}%`,
-          bannerHeroMobilePosition: `${Math.round(editBannerMobX)}% ${Math.round(editBannerMobY)}%`,
-        },
-      });
-
-      if (editBannerFile) {
-        await uploadAlbumBannerDirect({
-          albumId: editingAlbum.id,
-          file: editBannerFile,
-          api: studioApiFetch,
-          onProgress: () => {},
-        });
-      }
-
-      if (editNewHighlightFiles.length > 0) {
-        await uploadAlbumHighlightsDirect({
-          albumId: editingAlbum.id,
-          files: editNewHighlightFiles,
-          api: studioApiFetch,
-          onProgress: () => {},
-        });
-      }
-
-      const pendingTabs = Object.entries(editPendingGalleryByTab).filter(([, files]) => files.length > 0);
-      for (const [tabId, files] of pendingTabs) {
-        await uploadAlbumGalleryTabDirect({
-          albumId: editingAlbum.id,
-          tabId,
-          files,
-          api: studioApiFetch,
-          onProgress: () => {},
-        });
-      }
-
-      const refreshed = await studioApiFetch<{ album: any }>(`/api/studio/albums/${editingAlbum.id}`);
-      setAlbums((prev) => prev.map((a) => (a.id === editingAlbum.id ? mapApiAlbumToRow(refreshed.album) : a)));
+      const album = await flushEditChangesToServer();
+      setAlbums((prev) => prev.map((a) => (a.id === editingAlbum.id ? mapApiAlbumToRow(album) : a)));
       resetEditStaging();
       closeEdit();
     } catch (e) {
       window.alert(e instanceof Error ? e.message : "Failed to save album");
     } finally {
       setEditSaving(false);
+    }
+  };
+
+  const publishEditAlbum = async () => {
+    if (!editingAlbum || !editTitle.trim() || editDetailAlbum?.isPublished) return;
+    setEditPublishSubmitting(true);
+    try {
+      const albumAfterFlush = await flushEditChangesToServer();
+      setEditDetailAlbum(albumAfterFlush);
+      const published = await studioApiFetch<{ album: any; shareUrl?: string }>(
+        `/api/studio/albums/${editingAlbum.id}/publish`,
+        { method: "POST", body: {} }
+      );
+      const row = mapApiAlbumToRow(published.album);
+      setAlbums((prev) => prev.map((a) => (a.id === editingAlbum.id ? row : a)));
+      setEditingAlbum(row);
+      setEditDetailAlbum(published.album);
+      resetEditStaging();
+    } catch (e) {
+      window.alert(e instanceof Error ? e.message : "Failed to publish album");
+    } finally {
+      setEditPublishSubmitting(false);
+    }
+  };
+
+  const deleteAlbumRow = async (album: StudioAlbumRecord) => {
+    if (!window.confirm(`Delete album "${album.title}"? This cannot be undone.`)) return;
+    try {
+      await studioApiFetch(`/api/studio/albums/${encodeURIComponent(album.id)}`, { method: "DELETE" });
+      setAlbums((prev) => prev.filter((a) => a.id !== album.id));
+      if (editingAlbum?.id === album.id) closeEdit();
+    } catch (e) {
+      window.alert(e instanceof Error ? e.message : "Failed to delete album");
     }
   };
 
@@ -610,7 +655,7 @@ export default function StudioAlbumsSection() {
     }
   };
 
-  return (
+  const albumListView = (
     <>
       <PageHeader
         eyebrow="Module 3"
@@ -715,6 +760,15 @@ export default function StudioAlbumsSection() {
                               <Pencil className="h-4 w-4" strokeWidth={1.75} />
                               Edit
                             </button>
+                            <button
+                              type="button"
+                              onClick={() => void deleteAlbumRow(row)}
+                              className="inline-flex items-center gap-1.5 rounded-lg px-2 py-1.5 text-sm font-semibold text-rose-700 hover:bg-rose-50"
+                              title="Delete album"
+                            >
+                              <Trash2 className="h-4 w-4" strokeWidth={1.75} />
+                              Delete
+                            </button>
                           </div>
                         </td>
                       </tr>
@@ -727,39 +781,44 @@ export default function StudioAlbumsSection() {
         </div>
 
       </div>
+    </>
+  );
+
+  return (
+    <>
+      {!createOpen && !(editOpen && editingAlbum) ? albumListView : null}
 
       {createOpen ? (
-        <div className="fixed inset-0 z-50 flex items-end justify-center sm:items-center sm:p-4">
-          <button
-            type="button"
-            aria-label="Close"
-            className="absolute inset-0 bg-black/45"
-            onClick={closeCreate}
-          />
-          <div
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="album-wizard-title"
-            className="relative flex max-h-[92vh] w-full max-w-3xl flex-col overflow-hidden rounded-t-3xl border border-zinc-200 bg-white shadow-2xl sm:rounded-3xl"
-          >
-            <div className="flex items-start justify-between gap-4 border-b border-zinc-100 px-5 py-4">
-              <div>
-                <p id="album-wizard-title" className="text-base font-semibold text-zinc-900">
-                  New album
-                </p>
-                <WizardSteps step={createStep} />
-              </div>
-              <button
-                type="button"
-                className="rounded-xl border border-zinc-200 bg-white p-2 text-zinc-800 hover:bg-zinc-50"
-                onClick={closeCreate}
-                aria-label="Close dialog"
-              >
-                <X className="h-5 w-5" strokeWidth={1.75} />
-              </button>
+        <div
+          className="fixed inset-0 z-[70] flex flex-col bg-zinc-50"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="album-wizard-title"
+        >
+          <header className="flex shrink-0 items-center gap-3 border-b border-zinc-200 bg-white px-4 py-3 sm:px-6">
+            <button
+              type="button"
+              onClick={() => {
+                if (createPublishSubmitting) return;
+                if (createStep === "upload") setCreateStep("template");
+                else closeCreate();
+              }}
+              disabled={createPublishSubmitting}
+              className="inline-flex shrink-0 items-center gap-2 rounded-xl border border-zinc-200 bg-white px-3 py-2 text-sm font-semibold text-zinc-900 hover:bg-zinc-50 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              <ArrowLeft className="h-4 w-4" strokeWidth={2} aria-hidden />
+              {createStep === "upload" ? "Back" : "Albums"}
+            </button>
+            <div className="min-w-0 flex-1">
+              <p id="album-wizard-title" className="truncate text-base font-semibold text-zinc-900">
+                New album
+              </p>
+              <WizardSteps step={createStep} />
             </div>
+          </header>
 
-            <div className="min-h-0 flex-1 overflow-y-auto px-5 py-5">
+          <div className="min-h-0 flex-1 overflow-y-auto">
+            <div className="mx-auto max-w-3xl px-4 py-6 sm:px-6">
               {createStep === "template" ? (
                 <div className="space-y-5">
                   <div>
@@ -1102,8 +1161,10 @@ export default function StudioAlbumsSection() {
                 </div>
               ) : null}
             </div>
+          </div>
 
-            <div className="flex flex-col-reverse gap-2 border-t border-zinc-100 px-5 py-4 sm:flex-row sm:justify-between">
+          <footer className="shrink-0 border-t border-zinc-200 bg-white px-4 py-4 sm:px-6">
+            <div className="mx-auto flex max-w-3xl flex-col-reverse gap-2 sm:flex-row sm:justify-between">
               <GhostButton
                 type="button"
                 onClick={() => {
@@ -1141,52 +1202,58 @@ export default function StudioAlbumsSection() {
                 )}
               </div>
             </div>
-          </div>
+          </footer>
         </div>
       ) : null}
 
       {editOpen && editingAlbum ? (
-        <div className="fixed inset-0 z-50 flex items-end justify-center sm:items-center sm:p-4">
-          <button
-            type="button"
-            aria-label="Close"
-            className="absolute inset-0 bg-black/45"
-            onClick={closeEdit}
-            disabled={editSaving}
-          />
-          <div
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="edit-album-title"
-            className="relative flex max-h-[92vh] w-full max-w-3xl flex-col overflow-hidden rounded-t-3xl border border-zinc-200 bg-white shadow-2xl sm:rounded-3xl"
-          >
-            <div className="flex items-start justify-between gap-4 border-b border-zinc-100 px-5 py-4">
-              <div>
-                <p id="edit-album-title" className="text-base font-semibold text-zinc-900">
-                  Edit album
-                </p>
-                <p className="mt-1 text-sm text-zinc-600">
-                  Update title, banner framing, and staged uploads on Save. Removing a photo or tab applies immediately.
-                </p>
-              </div>
-              <button
-                type="button"
-                className="rounded-xl border border-zinc-200 bg-white p-2 text-zinc-800 hover:bg-zinc-50"
-                onClick={closeEdit}
-                aria-label="Close dialog"
-                disabled={editSaving}
-              >
-                <X className="h-5 w-5" strokeWidth={1.75} />
-              </button>
+        <div
+          className="fixed inset-0 z-[70] flex flex-col bg-zinc-50"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="edit-album-title"
+        >
+          <header className="flex shrink-0 items-center gap-3 border-b border-zinc-200 bg-white px-4 py-3 sm:px-6">
+            <button
+              type="button"
+              onClick={closeEdit}
+              disabled={editModalBusy}
+              className="inline-flex shrink-0 items-center gap-2 rounded-xl border border-zinc-200 bg-white px-3 py-2 text-sm font-semibold text-zinc-900 hover:bg-zinc-50 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              <ArrowLeft className="h-4 w-4" strokeWidth={2} aria-hidden />
+              Albums
+            </button>
+            <div className="min-w-0 flex-1">
+              <p id="edit-album-title" className="truncate text-base font-semibold text-zinc-900">
+                Edit album
+              </p>
+              <p className="mt-0.5 text-sm text-zinc-600">
+                Update title, banner framing, and staged uploads on Save. Removing a photo or tab applies immediately.
+              </p>
             </div>
+          </header>
 
-            <div className="min-h-0 flex-1 overflow-y-auto px-5 py-5 space-y-5">
+          <div className="min-h-0 flex-1 overflow-y-auto">
+            <div className="mx-auto max-w-3xl space-y-5 px-4 py-6 sm:px-6">
               {editDetailLoading ? (
                 <p className="py-10 text-center text-sm text-zinc-600">Loading album…</p>
               ) : !editDetailAlbum ? (
                 <p className="py-10 text-center text-sm text-red-700">Album could not be loaded.</p>
               ) : (
                 <>
+                  {editDetailAlbum.isPublished ? (
+                    <div className="flex flex-wrap items-center gap-2">
+                      <StatusBadge tone="good">Published</StatusBadge>
+                      <span className="text-xs text-zinc-600">Edits stay private until you save.</span>
+                    </div>
+                  ) : (
+                    <div className="flex flex-wrap items-center gap-2 rounded-xl border border-amber-200/80 bg-amber-50/80 px-3 py-2">
+                      <StatusBadge tone="neutral">Draft</StatusBadge>
+                      <span className="text-xs text-amber-950/90">
+                        Use <span className="font-semibold">Publish album</span> in the footer to save staged uploads and go live.
+                      </span>
+                    </div>
+                  )}
                   <div>
                     <label htmlFor="edit-album-name" className="text-sm font-semibold text-zinc-900">
                       Album name
@@ -1478,20 +1545,32 @@ export default function StudioAlbumsSection() {
                 </>
               )}
             </div>
+          </div>
 
-            <div className="flex flex-col-reverse gap-2 border-t border-zinc-100 px-5 py-4 sm:flex-row sm:justify-end sm:gap-3">
-              <GhostButton type="button" onClick={closeEdit} disabled={editSaving}>
+          <footer className="shrink-0 border-t border-zinc-200 bg-white px-4 py-4 sm:px-6">
+            <div className="mx-auto flex max-w-3xl flex-col-reverse gap-2 sm:flex-row sm:justify-end sm:gap-3">
+              <GhostButton type="button" onClick={closeEdit} disabled={editModalBusy}>
                 Cancel
               </GhostButton>
               <PrimaryButton
                 type="button"
                 onClick={() => void saveEdit()}
-                disabled={!editTitle.trim() || editSaving || editDetailLoading || !editDetailAlbum}
+                disabled={!editTitle.trim() || editModalBusy || editDetailLoading || !editDetailAlbum}
               >
                 {editSaving ? "Saving…" : "Save changes"}
               </PrimaryButton>
+              {editDetailAlbum && !editDetailAlbum.isPublished ? (
+                <PrimaryButton
+                  type="button"
+                  onClick={() => void publishEditAlbum()}
+                  disabled={!editTitle.trim() || editModalBusy || editDetailLoading || !editDetailAlbum}
+                  className="inline-flex h-10 items-center justify-center rounded-xl bg-emerald-700 px-4 text-sm font-semibold text-white shadow-sm hover:bg-emerald-800 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  {editPublishSubmitting ? "Publishing…" : "Publish album"}
+                </PrimaryButton>
+              ) : null}
             </div>
-          </div>
+          </footer>
         </div>
       ) : null}
     </>

@@ -158,6 +158,17 @@ async function publishAlbum(req, res) {
   return sendResult(res, result);
 }
 
+async function deleteAlbum(req, res) {
+  try {
+    const result = await studioAlbumsService.deleteAlbum(req.user, req.params.albumId);
+    return sendResult(res, result);
+  } catch (err) {
+    // eslint-disable-next-line no-console
+    console.error(err);
+    return res.status(500).json({ message: "Server error" });
+  }
+}
+
 module.exports = {
   createAlbum,
   listAlbums,
@@ -176,5 +187,6 @@ module.exports = {
   commitGalleryTabDirectUpload,
   uploadTabImages,
   deleteImage,
+  deleteAlbum,
   publishAlbum,
 };

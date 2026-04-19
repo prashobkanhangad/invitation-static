@@ -15,6 +15,7 @@ import {
   Lock,
   Maximize2,
   Plus,
+  Trash2,
   Upload,
   X,
 } from "lucide-react";
@@ -303,6 +304,27 @@ export default function StudioPhotoSelectionSection() {
       );
     } catch (e) {
       window.alert(e instanceof Error ? e.message : "Failed to publish");
+    }
+  };
+
+  const deletePhotoSelectionById = async (projectId: string, displayName: string) => {
+    if (
+      !window.confirm(
+        `Delete project "${displayName}"? All photos, tabs, and settings will be removed. This cannot be undone.`
+      )
+    ) {
+      return;
+    }
+    try {
+      await studioApiFetch(`/api/studio/photo-selection/projects/${encodeURIComponent(projectId)}`, {
+        method: "DELETE",
+      });
+      setProjects((prev) => prev.filter((p) => p.id !== projectId));
+      if (activeProjectId === projectId) {
+        setActiveProjectId(null);
+      }
+    } catch (e) {
+      window.alert(e instanceof Error ? e.message : "Failed to delete project");
     }
   };
 
@@ -944,6 +966,16 @@ export default function StudioPhotoSelectionSection() {
                 Publish
               </PrimaryButton>
             )}
+            <GhostButton
+              type="button"
+              onClick={() => void deletePhotoSelectionById(p.id, p.name)}
+              className="border-rose-200 text-rose-800 hover:bg-rose-50"
+            >
+              <span className="inline-flex items-center gap-2">
+                <Trash2 className="h-4 w-4" strokeWidth={1.75} />
+                Delete project
+              </span>
+            </GhostButton>
           </div>
         </div>
 
@@ -1357,6 +1389,7 @@ export default function StudioPhotoSelectionSection() {
                 <th className="px-5 py-3">Status</th>
                 <th className="px-5 py-3 text-right">Copy link</th>
                 <th className="px-5 py-3 text-right">Open</th>
+                <th className="px-5 py-3 text-right">Delete</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-zinc-100">
@@ -1379,11 +1412,14 @@ export default function StudioPhotoSelectionSection() {
                     <td className="px-5 py-3 text-right">
                       <div className={`ml-auto h-8 w-16 rounded-lg ${STUDIO_TABLE_SHIMMER}`} />
                     </td>
+                    <td className="px-5 py-3 text-right">
+                      <div className={`ml-auto h-8 w-10 rounded-lg ${STUDIO_TABLE_SHIMMER}`} />
+                    </td>
                   </tr>
                 ))
               ) : projects.length === 0 ? (
                 <tr className="bg-white">
-                  <td colSpan={5} className="px-5 py-10 text-center text-sm text-zinc-600">
+                  <td colSpan={6} className="px-5 py-10 text-center text-sm text-zinc-600">
                     No selection projects yet. Create one to get started.
                   </td>
                 </tr>
@@ -1434,6 +1470,17 @@ export default function StudioPhotoSelectionSection() {
                         >
                           Open
                           <ChevronRight className="h-4 w-4" strokeWidth={2} />
+                        </button>
+                      </td>
+                      <td className="px-5 py-3 text-right">
+                        <button
+                          type="button"
+                          onClick={() => void deletePhotoSelectionById(proj.id, proj.name)}
+                          className="inline-flex items-center justify-center rounded-lg p-2 text-rose-700 hover:bg-rose-50"
+                          title="Delete project"
+                          aria-label={`Delete project ${proj.name}`}
+                        >
+                          <Trash2 className="h-4 w-4" strokeWidth={1.75} />
                         </button>
                       </td>
                     </tr>

@@ -323,6 +323,16 @@ async function updatePhoto(user, projectId, photoId, payload) {
   return { photo };
 }
 
+async function deletePhotoSelectionProject(user, projectId) {
+  if (!mongoose.Types.ObjectId.isValid(projectId)) {
+    return { error: { status: 400, message: "Invalid project id" } };
+  }
+  const project = await getStudioProject(user, projectId);
+  if (!project) return { error: { status: 404, message: "Project not found" } };
+  await Project.deleteOne({ _id: project._id });
+  return { ok: true };
+}
+
 async function publishProject(user, projectId) {
   const project = await getStudioProject(user, projectId);
   if (!project) return { error: { status: 404, message: "Project not found" } };
@@ -346,5 +356,6 @@ module.exports = {
   preparePhotoDirectUploads,
   commitPhotoDirectUploads,
   updatePhoto,
+  deletePhotoSelectionProject,
   publishProject,
 };

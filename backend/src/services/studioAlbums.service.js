@@ -1,4 +1,5 @@
 const crypto = require("crypto");
+const mongoose = require("mongoose");
 const sharp = require("sharp");
 const Album = require("../models/Album");
 const {
@@ -504,6 +505,16 @@ async function commitGalleryTabDirectUploads(user, albumId, tabId, payload) {
   return { images: added };
 }
 
+async function deleteAlbum(user, albumId) {
+  if (!mongoose.Types.ObjectId.isValid(albumId)) {
+    return { error: { status: 400, message: "Invalid album id" } };
+  }
+  const album = await getStudioAlbum(user, albumId);
+  if (!album) return { error: { status: 404, message: "Album not found" } };
+  await Album.deleteOne({ _id: album._id });
+  return { ok: true };
+}
+
 async function publishAlbum(user, albumId, payload) {
   const album = await getStudioAlbum(user, albumId);
   if (!album) return { error: { status: 404, message: "Album not found" } };
@@ -550,5 +561,6 @@ module.exports = {
   prepareGalleryTabDirectUploads,
   commitGalleryTabDirectUploads,
   deleteImage,
+  deleteAlbum,
   publishAlbum,
 };
