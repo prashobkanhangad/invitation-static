@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { Heart, Check, Download, ChevronDown, X } from "lucide-react";
 import { API_BASE_URL, apiFetch } from "@/utils/api";
 
@@ -231,10 +232,10 @@ export default function PublicPhotoSelectionScreen({
 
   return (
     <main className="flex min-h-screen flex-col bg-[#f7f4ef] antialiased text-stone-900">
-      <section className="border-b border-black/5 bg-gradient-to-b from-[#faf6ef] to-[#f7f4ef] px-4 pb-8 pt-10 sm:px-6 sm:pt-14">
+      <section className="border-b border-black/5 bg-gradient-to-b from-[#faf6ef] to-[#f7f4ef] px-4 pb-5 pt-6 sm:px-6 sm:pb-6 sm:pt-8">
         <div className="mx-auto max-w-6xl">
           {loading ? (
-            <div className="space-y-4">
+            <div className="space-y-3">
               <div className={`h-2.5 w-40 rounded-md ${shimmerBar}`} />
               <div className={`h-9 max-w-md rounded-lg sm:h-10 ${shimmerBar}`} />
               <div className={`h-3 w-48 rounded-md ${shimmerBar}`} />
@@ -242,7 +243,7 @@ export default function PublicPhotoSelectionScreen({
           ) : (
             <div>
               {studioName.trim() ? (
-                <p className="mb-3 text-sm font-semibold tracking-wide text-stone-800 sm:text-base">
+                <p className="mb-1.5 text-sm font-semibold tracking-wide text-stone-800 sm:text-base">
                   {studioName.trim()}
                 </p>
               ) : null}
@@ -250,9 +251,9 @@ export default function PublicPhotoSelectionScreen({
                 {projectName || "Gallery"}
               </h1>
               {subheading.trim() ? (
-                <p className="mt-2 max-w-2xl text-sm text-stone-600 sm:text-base">{subheading}</p>
+                <p className="mt-1 max-w-2xl text-sm text-stone-600 sm:text-base">{subheading}</p>
               ) : null}
-              <p className="mt-3 text-xs font-semibold uppercase tracking-wide text-stone-500">
+              <p className="mt-1.5 text-xs font-semibold uppercase tracking-wide text-stone-500">
                 {selectedCount} selected · {photos.length} photos
               </p>
             </div>
@@ -260,7 +261,7 @@ export default function PublicPhotoSelectionScreen({
         </div>
       </section>
 
-      <section className="flex-1 px-4 py-8 sm:px-6 sm:py-10">
+      <section className="flex-1 px-4 py-5 sm:px-6 sm:py-6">
         <div className="mx-auto max-w-6xl">
           {loading ? (
             <div className="space-y-6">
@@ -284,7 +285,7 @@ export default function PublicPhotoSelectionScreen({
             </div>
           ) : (
             <>
-              <div className="mb-4 flex gap-2 overflow-x-auto pb-1">
+              <div className="mb-3 flex gap-2 overflow-x-auto pb-1">
                 <button
                   type="button"
                   onClick={() => setActiveTabId(ALL_TAB_ID)}
@@ -331,22 +332,22 @@ export default function PublicPhotoSelectionScreen({
                         className="absolute inset-0"
                         aria-label={`Open ${photo.label}`}
                       >
-                        <img
+                        <Image
                           src={
                             gridFallbackToOriginalById[photo.id]
                               ? photo.originalUrl || photo.url || ""
                               : photo.url || photo.originalUrl || ""
                           }
                           alt={photo.label}
-                          loading="lazy"
-                          decoding="async"
+                          fill
+                          sizes="(max-width: 768px) 50vw, 220px"
                           onError={() => {
                             if (!photo.originalUrl) return;
                             setGridFallbackToOriginalById((prev) =>
                               prev[photo.id] ? prev : { ...prev, [photo.id]: true }
                             );
                           }}
-                          className="absolute inset-0 h-full w-full object-cover"
+                          className="object-cover"
                         />
                         <span className="absolute inset-0 bg-gradient-to-t from-black/35 via-transparent to-transparent" />
                       </button>
@@ -502,19 +503,20 @@ export default function PublicPhotoSelectionScreen({
             </div>
             <div className="overflow-hidden rounded-2xl bg-black ring-1 ring-white/20">
               <div className="relative h-[70vh] w-full">
-                <img
+                <Image
                   src={
                     lightboxFallbackToOriginal
                       ? lightboxPhoto.originalUrl || lightboxPhoto.url || ""
                       : lightboxPhoto.url || lightboxPhoto.originalUrl || ""
                   }
                   alt={lightboxPhoto.label}
-                  decoding="async"
+                  fill
+                  sizes="100vw"
                   onError={() => {
                     if (!lightboxPhoto?.originalUrl) return;
                     setLightboxFallbackToOriginal(true);
                   }}
-                  className="absolute inset-0 h-full w-full object-contain"
+                  className="object-contain"
                 />
               </div>
             </div>
