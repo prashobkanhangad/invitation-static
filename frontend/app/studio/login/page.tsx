@@ -34,7 +34,7 @@ export default function StudioLoginPage() {
       });
       window.localStorage.setItem("studio_token", data.token);
       window.localStorage.setItem("studio_user", JSON.stringify(data.user));
-      router.replace("/studio/dashboard");
+      router.replace("/studio/dashboard/selection");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Login failed");
     } finally {

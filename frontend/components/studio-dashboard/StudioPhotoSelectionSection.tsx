@@ -96,8 +96,11 @@ export default function StudioPhotoSelectionSection() {
   const [uploadModalError, setUploadModalError] = useState<string | null>(null);
   const [studioFilterSelectedOnly, setStudioFilterSelectedOnly] = useState(false);
   const [studioFilterFavouriteOnly, setStudioFilterFavouriteOnly] = useState(false);
+  const [studioFilterTabId, setStudioFilterTabId] = useState<string>("__all__");
   const [studioImagePreviewId, setStudioImagePreviewId] = useState<string | null>(null);
   const [copiedProjectId, setCopiedProjectId] = useState<string | null>(null);
+  const [deletingPhotoId, setDeletingPhotoId] = useState<string | null>(null);
+  const [deletingTabId, setDeletingTabId] = useState<string | null>(null);
 
   const uploadModalInputId = useId();
 
@@ -193,14 +196,19 @@ export default function StudioPhotoSelectionSection() {
     return activeProject.photos.filter((ph) => {
       if (studioFilterSelectedOnly && !ph.picked) return false;
       if (studioFilterFavouriteOnly && !ph.fav) return false;
+      if (studioFilterTabId === "__unassigned__" && ph.tabId !== null) return false;
+      if (studioFilterTabId !== "__all__" && studioFilterTabId !== "__unassigned__" && ph.tabId !== studioFilterTabId) {
+        return false;
+      }
       return true;
     });
-  }, [activeProject, studioFilterSelectedOnly, studioFilterFavouriteOnly]);
+  }, [activeProject, studioFilterSelectedOnly, studioFilterFavouriteOnly, studioFilterTabId]);
 
   useEffect(() => {
     setStudioImagePreviewId(null);
     setStudioFilterSelectedOnly(false);
     setStudioFilterFavouriteOnly(false);
+    setStudioFilterTabId("__all__");
     setPinDraftInput("");
     setPinSettingsMessage(null);
     setWorkspacePinVisible(false);
@@ -272,6 +280,38 @@ export default function StudioPhotoSelectionSection() {
         fav: !(activeProject?.photos.find((ph) => ph.id === photoId)?.fav ?? false),
       },
     }).catch(() => {});
+  };
+
+  const deletePhotoById = async (photoId: string, label: string) => {
+    if (!activeProjectId) return;
+    if (!window.confirm(`Delete photo "${label}" from this project? This cannot be undone.`)) return;
+
+    setDeletingPhotoId(photoId);
+    try {
+      await studioApiFetch(`/api/studio/photo-selection/projects/${activeProjectId}/photos/${photoId}`, {
+        method: "DELETE",
+      });
+      setProjects((prev) =>
+        prev.map((p) => {
+          if (p.id !== activeProjectId) return p;
+          const nextPhotos = p.photos.filter((ph) => ph.id !== photoId);
+          return {
+            ...p,
+            photos: nextPhotos,
+            stats: {
+              ...p.stats,
+              uploadedLabel: String(nextPhotos.length),
+              visibleToClient: nextPhotos.length,
+            },
+          };
+        })
+      );
+      setStudioImagePreviewId((prev) => (prev === photoId ? null : prev));
+    } catch (e) {
+      window.alert(e instanceof Error ? e.message : "Failed to delete photo");
+    } finally {
+      setDeletingPhotoId(null);
+    }
   };
 
   const publishSelection = async () => {
@@ -354,24 +394,58 @@ export default function StudioPhotoSelectionSection() {
 
   const removeClientPreviewTab = async (tabId: string) => {
     if (!activeProjectId) return;
-    setProjects((prev) =>
-      prev.map((p) =>
-        p.id !== activeProjectId
-          ? p
-          : {
-              ...p,
-              clientPreviewTabs: p.clientPreviewTabs.filter((t) => t.id !== tabId),
-              photos: p.photos.map((ph) => (ph.tabId === tabId ? { ...ph, tabId: null } : ph)),
-            }
+    const project = projects.find((p) => p.id === activeProjectId);
+    const tab = project?.clientPreviewTabs.find((t) => t.id === tabId);
+    if (!project || !tab) return;
+    const tabPhotos = project.photos.filter((ph) => ph.tabId === tabId);
+    if (
+      !window.confirm(
+        `Delete tab "${tab.label}"?\n\nThis will permanently delete ${tabPhotos.length} photo${
+          tabPhotos.length === 1 ? "" : "s"
+        } in this tab and remove the tab. This cannot be undone.`
       )
-    );
+    ) {
+      return;
+    }
+    setDeletingTabId(tabId);
     try {
-      const updatedTabs = (projects.find((p) => p.id === activeProjectId)?.clientPreviewTabs ?? []).filter((t) => t.id !== tabId);
+      if (tabPhotos.length > 0) {
+        await Promise.all(
+          tabPhotos.map((ph) =>
+            studioApiFetch(
+              `/api/studio/photo-selection/projects/${encodeURIComponent(activeProjectId)}/photos/${encodeURIComponent(ph.id)}`,
+              { method: "DELETE" }
+            )
+          )
+        );
+      }
+      const updatedTabs = project.clientPreviewTabs.filter((t) => t.id !== tabId);
       await studioApiFetch(`/api/studio/photo-selection/projects/${activeProjectId}`, {
         method: "PATCH",
         body: { clientTabs: updatedTabs },
       });
-    } catch {}
+      setProjects((prev) =>
+        prev.map((p) => {
+          if (p.id !== activeProjectId) return p;
+          const remainingPhotos = p.photos.filter((ph) => ph.tabId !== tabId);
+          return {
+            ...p,
+            clientPreviewTabs: updatedTabs,
+            photos: remainingPhotos,
+            stats: {
+              ...p.stats,
+              uploadedLabel: String(remainingPhotos.length),
+              visibleToClient: remainingPhotos.length,
+            },
+          };
+        })
+      );
+      setStudioFilterTabId((prev) => (prev === tabId ? "__all__" : prev));
+    } catch (e) {
+      window.alert(e instanceof Error ? e.message : "Failed to delete tab");
+    } finally {
+      setDeletingTabId(null);
+    }
   };
 
   const savePinSettings = async () => {
@@ -774,6 +848,7 @@ export default function StudioPhotoSelectionSection() {
       studioImagePreviewId !== null
         ? (p.photos.find((ph) => ph.id === studioImagePreviewId) ?? null)
         : null;
+    const hasWorkspaceFilter = studioFilterSelectedOnly || studioFilterFavouriteOnly || studioFilterTabId !== "__all__";
 
     const uploadPhotoModal =
       uploadModalOpen ? (
@@ -1004,10 +1079,15 @@ export default function StudioPhotoSelectionSection() {
                       <button
                         type="button"
                         onClick={() => removeClientPreviewTab(tab.id)}
-                        className="rounded-lg p-1.5 text-zinc-500 hover:bg-white hover:text-zinc-900"
+                        className="rounded-lg p-1.5 text-zinc-500 hover:bg-white hover:text-zinc-900 disabled:cursor-not-allowed disabled:opacity-50"
                         aria-label={`Remove tab ${tab.label}`}
+                        disabled={deletingTabId === tab.id}
                       >
-                        <X className="h-4 w-4" strokeWidth={2} />
+                        {deletingTabId === tab.id ? (
+                          <span className="text-[10px] font-semibold">...</span>
+                        ) : (
+                          <X className="h-4 w-4" strokeWidth={2} />
+                        )}
                       </button>
                     </li>
                   ))}
@@ -1117,6 +1197,22 @@ export default function StudioPhotoSelectionSection() {
           <section className="min-w-0 space-y-4 xl:order-1">
             <div className="flex flex-col gap-3 rounded-2xl border border-zinc-200/80 bg-white p-4 shadow-sm lg:flex-row lg:items-center lg:justify-between">
               <div className="flex flex-wrap items-center gap-2">
+                <label className="inline-flex h-10 items-center gap-2 rounded-xl border border-zinc-200 bg-white px-3 text-xs font-semibold text-zinc-700">
+                  <span>Tab</span>
+                  <select
+                    value={studioFilterTabId}
+                    onChange={(e) => setStudioFilterTabId(e.target.value)}
+                    className="bg-transparent text-xs font-semibold text-zinc-900 outline-none"
+                  >
+                    <option value="__all__">All tabs</option>
+                    <option value="__unassigned__">Unassigned</option>
+                    {p.clientPreviewTabs.map((tab) => (
+                      <option key={tab.id} value={tab.id}>
+                        {tab.label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
                 <button
                   type="button"
                   onClick={() => setStudioFilterSelectedOnly((v) => !v)}
@@ -1146,12 +1242,13 @@ export default function StudioPhotoSelectionSection() {
                   />
                   Favourite
                 </button>
-                {studioFilterSelectedOnly || studioFilterFavouriteOnly ? (
+                {hasWorkspaceFilter ? (
                   <button
                     type="button"
                     onClick={() => {
                       setStudioFilterSelectedOnly(false);
                       setStudioFilterFavouriteOnly(false);
+                      setStudioFilterTabId("__all__");
                     }}
                     className="text-xs font-semibold text-zinc-600 underline-offset-2 hover:text-zinc-900 hover:underline"
                   >
@@ -1211,13 +1308,14 @@ export default function StudioPhotoSelectionSection() {
                 <div className="rounded-2xl border border-dashed border-zinc-300 bg-zinc-50 py-12 text-center">
                   <p className="text-sm font-semibold text-zinc-900">No photos match these filters</p>
                   <p className="mt-1 text-sm text-zinc-600">
-                    Try turning off Selected or Favourite, or pick more images in the grid.
+                    Try changing Tab / Selected / Favourite filters, or add more images.
                   </p>
                   <button
                     type="button"
                     onClick={() => {
                       setStudioFilterSelectedOnly(false);
                       setStudioFilterFavouriteOnly(false);
+                      setStudioFilterTabId("__all__");
                     }}
                     className="mt-4 text-sm font-semibold text-zinc-900 underline underline-offset-2"
                   >
@@ -1268,8 +1366,23 @@ export default function StudioPhotoSelectionSection() {
                         }}
                         className="absolute bottom-2 right-2 z-10 inline-flex h-8 w-8 items-center justify-center rounded-full border border-zinc-200/90 bg-white/95 text-zinc-800 shadow-md hover:bg-white"
                         aria-label={`Preview ${t.label} larger`}
+                        disabled={deletingPhotoId === t.id}
                       >
                         <Maximize2 className="h-4 w-4" strokeWidth={2} />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          void deletePhotoById(t.id, t.label);
+                        }}
+                        className="absolute bottom-2 right-12 z-10 inline-flex h-8 w-8 items-center justify-center rounded-full border border-rose-200 bg-white/95 text-rose-700 shadow-md hover:bg-rose-50 disabled:cursor-not-allowed disabled:opacity-50"
+                        aria-label={`Delete ${t.label}`}
+                        disabled={deletingPhotoId === t.id}
+                        title="Delete photo"
+                      >
+                        <Trash2 className="h-4 w-4" strokeWidth={1.75} />
                       </button>
                     </div>
                   ))}
@@ -1329,12 +1442,22 @@ export default function StudioPhotoSelectionSection() {
                   type="button"
                   onClick={() => toggleFav(studioPreviewPhoto.id)}
                   className="inline-flex h-10 items-center gap-2 rounded-xl border border-white/25 bg-white/10 px-4 text-sm font-semibold text-white hover:bg-white/20"
+                  disabled={deletingPhotoId === studioPreviewPhoto.id}
                 >
                   <Heart
                     className={["h-4 w-4", studioPreviewPhoto.fav ? "fill-current text-rose-300" : ""].join(" ")}
                     strokeWidth={1.75}
                   />
                   {studioPreviewPhoto.fav ? "Remove favourite" : "Mark favourite"}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => void deletePhotoById(studioPreviewPhoto.id, studioPreviewPhoto.label)}
+                  className="inline-flex h-10 items-center gap-2 rounded-xl border border-rose-300/70 bg-rose-500/20 px-4 text-sm font-semibold text-white hover:bg-rose-500/30 disabled:cursor-not-allowed disabled:opacity-50"
+                  disabled={deletingPhotoId === studioPreviewPhoto.id}
+                >
+                  <Trash2 className="h-4 w-4" strokeWidth={1.75} />
+                  {deletingPhotoId === studioPreviewPhoto.id ? "Deleting..." : "Delete photo"}
                 </button>
               </div>
               <p className="text-center text-xs text-white/60">Escape or backdrop to close</p>

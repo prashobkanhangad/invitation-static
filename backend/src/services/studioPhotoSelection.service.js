@@ -240,7 +240,8 @@ async function preparePhotoDirectUploads(user, projectId, payload) {
   return { uploads, expiresInSeconds: 1200 };
 }
 
-async function commitPhotoDirectUploads(user, projectId, payload) {
+async function commitPhotoDirectUploads(user, projectId, payload, options = {}) {
+  const onProgress = typeof options?.onProgress === "function" ? options.onProgress : null;
   const project = await getStudioProject(user, projectId);
   if (!project) return { error: { status: 404, message: "Project not found" } };
   const items = Array.isArray(payload?.items) ? payload.items : [];
@@ -257,8 +258,10 @@ async function commitPhotoDirectUploads(user, projectId, payload) {
   const defaultTabId = typeof payload?.tabId === "string" && payload.tabId ? payload.tabId : null;
 
   const next = [];
+  if (onProgress) await onProgress({ total: items.length, done: 0, message: "Processing photos" });
 
-  for (const item of items) {
+  for (let i = 0; i < items.length; i += 1) {
+    const item = items[i];
     const key = typeof item?.key === "string" ? item.key : "";
     const originalName = typeof item?.originalName === "string" ? item.originalName : "image.jpg";
     const mimeType = typeof item?.mimeType === "string" ? item.mimeType : "image/jpeg";
@@ -303,6 +306,7 @@ async function commitPhotoDirectUploads(user, projectId, payload) {
       picked: false,
       fav: false,
     });
+    if (onProgress) await onProgress({ total: items.length, done: i + 1, message: `Processed ${i + 1}/${items.length}` });
   }
 
   project.photoSelection.photos = [...(project.photoSelection.photos || []), ...next];
@@ -321,6 +325,46 @@ async function updatePhoto(user, projectId, photoId, payload) {
   if (typeof tabId === "string" || tabId === null) photo.tabId = tabId;
   await project.save();
   return { photo };
+}
+
+function objectKeyFromUrl(url) {
+  if (!url || typeof url !== "string") return "";
+  try {
+    const parsed = new URL(url);
+    const key = parsed.pathname.replace(/^\/+/, "");
+    if (!key) return "";
+    const bucketName = String(process.env.GCP_STORAGE_BUCKET || "").trim();
+    if (bucketName && key.startsWith(`${bucketName}/`)) {
+      return key.slice(bucketName.length + 1);
+    }
+    return key;
+  } catch {
+    return "";
+  }
+}
+
+async function deletePhoto(user, projectId, photoId) {
+  const project = await getStudioProject(user, projectId);
+  if (!project) return { error: { status: 404, message: "Project not found" } };
+
+  const photos = Array.isArray(project.photoSelection?.photos) ? project.photoSelection.photos : [];
+  const photoIndex = photos.findIndex((p) => p.id === photoId);
+  if (photoIndex < 0) return { error: { status: 404, message: "Photo not found" } };
+
+  const [photo] = photos.splice(photoIndex, 1);
+  project.photoSelection.photos = photos;
+  await project.save();
+
+  const provider = await getActiveStorageProvider();
+  const maybeUrls = [photo?.url, photo?.originalUrl, photo?.thumbUrl];
+  await Promise.all(
+    maybeUrls
+      .map((url) => objectKeyFromUrl(url))
+      .filter(Boolean)
+      .map((key) => deleteObjectAtKey({ key, provider }).catch(() => {}))
+  );
+
+  return { ok: true, photoId };
 }
 
 async function deletePhotoSelectionProject(user, projectId) {
@@ -356,6 +400,7 @@ module.exports = {
   preparePhotoDirectUploads,
   commitPhotoDirectUploads,
   updatePhoto,
+  deletePhoto,
   deletePhotoSelectionProject,
   publishProject,
 };

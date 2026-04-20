@@ -2,7 +2,6 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import Image from "next/image";
 import { Heart, Check, Download, ChevronDown, X } from "lucide-react";
 import { API_BASE_URL, apiFetch } from "@/utils/api";
 
@@ -87,6 +86,8 @@ export default function PublicPhotoSelectionScreen({
   const [favById, setFavById] = useState<Record<string, boolean>>({});
   const [downloadMenuOpen, setDownloadMenuOpen] = useState(false);
   const [downloadBusy, setDownloadBusy] = useState<"original" | "optimized" | null>(null);
+  const [lightboxOriginalSizeLabel, setLightboxOriginalSizeLabel] = useState<string>("");
+  const [lightboxOptimizedSizeLabel, setLightboxOptimizedSizeLabel] = useState<string>("");
 
   useEffect(() => {
     setSelectedById(
@@ -109,6 +110,49 @@ export default function PublicPhotoSelectionScreen({
   useEffect(() => {
     if (!lightboxPhoto) setDownloadMenuOpen(false);
   }, [lightboxPhoto]);
+
+  useEffect(() => {
+    if (!lightboxPhoto) {
+      setLightboxOriginalSizeLabel("");
+      setLightboxOptimizedSizeLabel("");
+      return;
+    }
+    const photoId = lightboxPhoto.id;
+    const controller = new AbortController();
+    const headers: Record<string, string> = {};
+    if (accessToken) headers.Authorization = `Bearer ${accessToken}`;
+
+    async function fetchVariantSize(variant: "original" | "optimized"): Promise<string> {
+      try {
+        const path = `${photoSelectionPhotoApiPath(publicLookup, photoId)}/download?variant=${variant}`;
+        const url = `${API_BASE_URL}${path.startsWith("/") ? "" : "/"}${path}`;
+        const res = await fetch(url, {
+          method: "HEAD",
+          headers,
+          signal: controller.signal,
+        });
+        if (!res.ok) return "";
+        const contentLength = Number(res.headers.get("content-length") || "");
+        if (!Number.isFinite(contentLength) || contentLength <= 0) return "";
+        return formatBytes(contentLength);
+      } catch {
+        return "";
+      }
+    }
+
+    async function loadVariantSizes() {
+      const [originalSize, optimizedSize] = await Promise.all([
+        fetchVariantSize("original"),
+        fetchVariantSize("optimized"),
+      ]);
+      if (controller.signal.aborted) return;
+      setLightboxOriginalSizeLabel(originalSize);
+      setLightboxOptimizedSizeLabel(optimizedSize);
+    }
+
+    void loadVariantSizes();
+    return () => controller.abort();
+  }, [lightboxPhoto, publicLookup, accessToken]);
 
   const toggleSelected = (photoId: string) => {
     const nextPicked = !selectedById[photoId];
@@ -138,8 +182,6 @@ export default function PublicPhotoSelectionScreen({
 
   const downloadPhoto = async (kind: "original" | "optimized") => {
     if (!lightboxPhoto) return;
-    const idKey = publicLookup.kind === "slug" ? publicLookup.slug : publicLookup.shareToken;
-    if (!idKey) return;
     setDownloadBusy(kind);
     setDownloadMenuOpen(false);
     try {
@@ -169,6 +211,19 @@ export default function PublicPhotoSelectionScreen({
       setDownloadBusy(null);
     }
   };
+
+  function formatBytes(bytes: number): string {
+    if (!Number.isFinite(bytes) || bytes <= 0) return "";
+    const units = ["B", "KB", "MB", "GB", "TB"];
+    let value = bytes;
+    let idx = 0;
+    while (value >= 1024 && idx < units.length - 1) {
+      value /= 1024;
+      idx += 1;
+    }
+    const decimals = value >= 100 || idx === 0 ? 0 : value >= 10 ? 1 : 2;
+    return `${value.toFixed(decimals)} ${units[idx]}`;
+  }
 
   return (
     <main className="flex min-h-screen flex-col bg-[#f7f4ef] antialiased text-stone-900">
@@ -272,12 +327,12 @@ export default function PublicPhotoSelectionScreen({
                         className="absolute inset-0"
                         aria-label={`Open ${photo.label}`}
                       >
-                        <Image
-                          src={photo.url}
+                        <img
+                          src={photo.url || photo.originalUrl || ""}
                           alt={photo.label}
-                          fill
-                          sizes="(max-width: 768px) 50vw, 220px"
-                          className="object-cover"
+                          loading="lazy"
+                          decoding="async"
+                          className="absolute inset-0 h-full w-full object-cover"
                         />
                         <span className="absolute inset-0 bg-gradient-to-t from-black/35 via-transparent to-transparent" />
                       </button>
@@ -345,6 +400,28 @@ export default function PublicPhotoSelectionScreen({
               <button
                 type="button"
                 onClick={() => {
+                  if (lightboxPhoto) toggleSelected(lightboxPhoto.id);
+                }}
+                className={[
+                  "inline-flex h-10 items-center rounded-xl border border-white/20 bg-white/10 px-3 text-sm font-semibold text-white hover:bg-white/20",
+                  lightboxPhoto && selectedById[lightboxPhoto.id] ? "text-white" : "text-white/90",
+                ].join(" ")}
+                aria-label={
+                  lightboxPhoto && selectedById[lightboxPhoto.id] ? "Remove selection" : "Select photo"
+                }
+              >
+                {lightboxPhoto && selectedById[lightboxPhoto.id] ? (
+                  <>
+                    <Check className="mr-1 h-4 w-4" strokeWidth={2.5} />
+                    Selected
+                  </>
+                ) : (
+                  "Select"
+                )}
+              </button>
+              <button
+                type="button"
+                onClick={() => {
                   if (lightboxPhoto) toggleFav(lightboxPhoto.id);
                 }}
                 className={[
@@ -379,7 +456,11 @@ export default function PublicPhotoSelectionScreen({
                       className="flex w-full flex-col rounded-lg px-3 py-2 text-left text-white hover:bg-white/10"
                     >
                       <span className="text-sm font-semibold">Original</span>
-                      <span className="text-xs text-white/65">Best quality, larger size</span>
+                      <span className="text-xs text-white/65">
+                        {lightboxOriginalSizeLabel
+                          ? `File size: ${lightboxOriginalSizeLabel}`
+                          : "Best quality, larger size"}
+                      </span>
                     </button>
                     <button
                       type="button"
@@ -387,7 +468,11 @@ export default function PublicPhotoSelectionScreen({
                       className="mt-1 flex w-full flex-col rounded-lg px-3 py-2 text-left text-white hover:bg-white/10"
                     >
                       <span className="text-sm font-semibold">Optimized</span>
-                      <span className="text-xs text-white/65">Smaller web-friendly file</span>
+                      <span className="text-xs text-white/65">
+                        {lightboxOptimizedSizeLabel
+                          ? `File size: ${lightboxOptimizedSizeLabel}`
+                          : "Smaller web-friendly lite"}
+                      </span>
                     </button>
                   </div>
                 ) : null}
@@ -403,7 +488,12 @@ export default function PublicPhotoSelectionScreen({
             </div>
             <div className="overflow-hidden rounded-2xl bg-black ring-1 ring-white/20">
               <div className="relative h-[70vh] w-full">
-                <Image src={lightboxPhoto.url} alt={lightboxPhoto.label} fill sizes="100vw" className="object-contain" />
+                <img
+                  src={lightboxPhoto.url || lightboxPhoto.originalUrl || ""}
+                  alt={lightboxPhoto.label}
+                  decoding="async"
+                  className="absolute inset-0 h-full w-full object-contain"
+                />
               </div>
             </div>
           </div>

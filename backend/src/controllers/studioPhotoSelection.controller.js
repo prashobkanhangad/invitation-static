@@ -1,4 +1,5 @@
 const studioPhotoSelectionService = require("../services/studioPhotoSelection.service");
+const uploadJobsService = require("../services/uploadJobs.service");
 
 async function createProject(req, res) {
   try {
@@ -61,9 +62,20 @@ async function preparePhotoDirectUpload(req, res) {
 
 async function commitPhotoDirectUpload(req, res) {
   try {
-    const result = await studioPhotoSelectionService.commitPhotoDirectUploads(req.user, req.params.projectId, req.body);
-    if (result.error) return res.status(result.error.status).json({ message: result.error.message });
-    return res.status(201).json(result);
+    const job = await uploadJobsService.createUploadJob(req.user.id, "photo_selection_commit", {
+      projectId: req.params.projectId,
+    });
+    uploadJobsService.runUploadJob(job._id, async (updateProgress) => {
+      const result = await studioPhotoSelectionService.commitPhotoDirectUploads(
+        req.user,
+        req.params.projectId,
+        req.body,
+        { onProgress: updateProgress }
+      );
+      if (result.error) throw new Error(result.error.message);
+      return result;
+    });
+    return res.status(202).json({ jobId: String(job._id), status: "queued" });
   } catch (err) {
     // eslint-disable-next-line no-console
     console.error(err);
@@ -78,6 +90,12 @@ async function updatePhoto(req, res) {
     req.params.photoId,
     req.body
   );
+  if (result.error) return res.status(result.error.status).json({ message: result.error.message });
+  return res.json(result);
+}
+
+async function deletePhoto(req, res) {
+  const result = await studioPhotoSelectionService.deletePhoto(req.user, req.params.projectId, req.params.photoId);
   if (result.error) return res.status(result.error.status).json({ message: result.error.message });
   return res.json(result);
 }
@@ -109,6 +127,7 @@ module.exports = {
   preparePhotoDirectUpload,
   commitPhotoDirectUpload,
   updatePhoto,
+  deletePhoto,
   deletePhotoSelectionProject,
   publishProject,
 };

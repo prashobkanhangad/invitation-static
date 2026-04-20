@@ -289,7 +289,8 @@ async function prepareBannerDirectUpload(user, albumId, payload) {
   };
 }
 
-async function commitBannerDirectUpload(user, albumId, payload) {
+async function commitBannerDirectUpload(user, albumId, payload, options = {}) {
+  const onProgress = typeof options?.onProgress === "function" ? options.onProgress : null;
   const album = await getStudioAlbum(user, albumId);
   if (!album) return { error: { status: 404, message: "Album not found" } };
   const key = typeof payload?.key === "string" ? payload.key : "";
@@ -301,6 +302,7 @@ async function commitBannerDirectUpload(user, albumId, payload) {
   }
   const provider = await getActiveStorageProvider();
   const folder = `albums/${String(user.id || "unknown-user")}/${String(album._id)}`;
+  if (onProgress) await onProgress({ total: 1, done: 0, message: "Processing banner" });
   let buffer;
   try {
     buffer = await downloadObjectBuffer({ key, provider });
@@ -330,6 +332,7 @@ async function commitBannerDirectUpload(user, albumId, payload) {
     order: 0,
   };
   await album.save();
+  if (onProgress) await onProgress({ total: 1, done: 1, message: "Banner committed" });
   return { bannerImage: album.bannerImage };
 }
 
@@ -365,7 +368,8 @@ async function prepareHighlightsDirectUploads(user, albumId, payload) {
   return { uploads, expiresInSeconds: 1200 };
 }
 
-async function commitHighlightsDirectUploads(user, albumId, payload) {
+async function commitHighlightsDirectUploads(user, albumId, payload, options = {}) {
+  const onProgress = typeof options?.onProgress === "function" ? options.onProgress : null;
   const album = await getStudioAlbum(user, albumId);
   if (!album) return { error: { status: 404, message: "Album not found" } };
   const items = Array.isArray(payload?.items) ? payload.items : [];
@@ -375,6 +379,7 @@ async function commitHighlightsDirectUploads(user, albumId, payload) {
   const expectedPrefix = stagingPrefixAlbum(user.id, album._id);
   const start = album.highlights.length;
   const added = [];
+  if (onProgress) await onProgress({ total: items.length, done: 0, message: "Processing highlights" });
   for (let i = 0; i < items.length; i += 1) {
     const item = items[i];
     const key = typeof item?.key === "string" ? item.key : "";
@@ -411,6 +416,7 @@ async function commitHighlightsDirectUploads(user, albumId, payload) {
       mimeType,
       order: start + i,
     });
+    if (onProgress) await onProgress({ total: items.length, done: i + 1, message: `Processed ${i + 1}/${items.length}` });
   }
   album.highlights = [...album.highlights, ...added];
   await album.save();
@@ -451,7 +457,8 @@ async function prepareGalleryTabDirectUploads(user, albumId, tabId, payload) {
   return { uploads, expiresInSeconds: 1200 };
 }
 
-async function commitGalleryTabDirectUploads(user, albumId, tabId, payload) {
+async function commitGalleryTabDirectUploads(user, albumId, tabId, payload, options = {}) {
+  const onProgress = typeof options?.onProgress === "function" ? options.onProgress : null;
   const album = await getStudioAlbum(user, albumId);
   if (!album) return { error: { status: 404, message: "Album not found" } };
   const tab = album.galleryTabs.find((t) => t.id === tabId);
@@ -463,6 +470,7 @@ async function commitGalleryTabDirectUploads(user, albumId, tabId, payload) {
   const expectedPrefix = stagingPrefixAlbum(user.id, album._id);
   const start = tab.images.length;
   const added = [];
+  if (onProgress) await onProgress({ total: items.length, done: 0, message: "Processing gallery images" });
   for (let i = 0; i < items.length; i += 1) {
     const item = items[i];
     const key = typeof item?.key === "string" ? item.key : "";
@@ -499,6 +507,7 @@ async function commitGalleryTabDirectUploads(user, albumId, tabId, payload) {
       mimeType,
       order: start + i,
     });
+    if (onProgress) await onProgress({ total: items.length, done: i + 1, message: `Processed ${i + 1}/${items.length}` });
   }
   tab.images = [...tab.images, ...added];
   await album.save();

@@ -1,4 +1,5 @@
 const studioAlbumsService = require("../services/studioAlbums.service");
+const uploadJobsService = require("../services/uploadJobs.service");
 
 function sendResult(res, result, successStatus = 200) {
   if (result.error) return res.status(result.error.status).json({ message: result.error.message });
@@ -44,8 +45,17 @@ async function prepareBannerDirectUpload(req, res) {
 
 async function commitBannerDirectUpload(req, res) {
   try {
-    const result = await studioAlbumsService.commitBannerDirectUpload(req.user, req.params.albumId, req.body);
-    return sendResult(res, result, 201);
+    const job = await uploadJobsService.createUploadJob(req.user.id, "album_banner_commit", {
+      albumId: req.params.albumId,
+    });
+    uploadJobsService.runUploadJob(job._id, async (updateProgress) => {
+      const result = await studioAlbumsService.commitBannerDirectUpload(req.user, req.params.albumId, req.body, {
+        onProgress: updateProgress,
+      });
+      if (result.error) throw new Error(result.error.message);
+      return result;
+    });
+    return res.status(202).json({ jobId: String(job._id), status: "queued" });
   } catch (err) {
     // eslint-disable-next-line no-console
     console.error(err);
@@ -71,8 +81,17 @@ async function prepareHighlightsDirectUpload(req, res) {
 
 async function commitHighlightsDirectUpload(req, res) {
   try {
-    const result = await studioAlbumsService.commitHighlightsDirectUploads(req.user, req.params.albumId, req.body);
-    return sendResult(res, result, 201);
+    const job = await uploadJobsService.createUploadJob(req.user.id, "album_highlights_commit", {
+      albumId: req.params.albumId,
+    });
+    uploadJobsService.runUploadJob(job._id, async (updateProgress) => {
+      const result = await studioAlbumsService.commitHighlightsDirectUploads(req.user, req.params.albumId, req.body, {
+        onProgress: updateProgress,
+      });
+      if (result.error) throw new Error(result.error.message);
+      return result;
+    });
+    return res.status(202).json({ jobId: String(job._id), status: "queued" });
   } catch (err) {
     // eslint-disable-next-line no-console
     console.error(err);
@@ -123,13 +142,22 @@ async function prepareGalleryTabDirectUpload(req, res) {
 
 async function commitGalleryTabDirectUpload(req, res) {
   try {
-    const result = await studioAlbumsService.commitGalleryTabDirectUploads(
-      req.user,
-      req.params.albumId,
-      req.params.tabId,
-      req.body
-    );
-    return sendResult(res, result, 201);
+    const job = await uploadJobsService.createUploadJob(req.user.id, "album_gallery_commit", {
+      albumId: req.params.albumId,
+      tabId: req.params.tabId,
+    });
+    uploadJobsService.runUploadJob(job._id, async (updateProgress) => {
+      const result = await studioAlbumsService.commitGalleryTabDirectUploads(
+        req.user,
+        req.params.albumId,
+        req.params.tabId,
+        req.body,
+        { onProgress: updateProgress }
+      );
+      if (result.error) throw new Error(result.error.message);
+      return result;
+    });
+    return res.status(202).json({ jobId: String(job._id), status: "queued" });
   } catch (err) {
     // eslint-disable-next-line no-console
     console.error(err);

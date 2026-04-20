@@ -17,6 +17,7 @@ const adminSettingsRoutes = require("./routes/admin/settings.routes");
 const studioAlbumsRoutes = require("./routes/studio/albums.routes");
 const studioPhotoSelectionRoutes = require("./routes/studio/photoSelection.routes");
 const studioAccountRoutes = require("./routes/studio/account.routes");
+const studioUploadJobsRoutes = require("./routes/studio/uploadJobs.routes");
 
 const app = express();
 
@@ -54,6 +55,7 @@ app.use("/api/admin/settings", adminSettingsRoutes);
 app.use("/api/studio/albums", studioAlbumsRoutes);
 app.use("/api/studio/photo-selection", studioPhotoSelectionRoutes);
 app.use("/api/studio/account", studioAccountRoutes);
+app.use("/api/studio/upload-jobs", studioUploadJobsRoutes);
 app.use("/api/public", publicProjectsRoutes);
 
 // Error handler for multer + general API errors.
