@@ -327,6 +327,42 @@ async function updatePhoto(user, projectId, photoId, payload) {
   return { photo };
 }
 
+async function uploadPhotoSelectionOgImage(user, projectId, file) {
+  const project = await getStudioProject(user, projectId);
+  if (!project) return { error: { status: 404, message: "Project not found" } };
+  if (!file?.buffer) return { error: { status: 400, message: "Image file is required" } };
+
+  const provider = await getActiveStorageProvider();
+  const ownerKey = String(user.id || "unknown-user");
+  const projectKey = String(project._id || projectId);
+  const folder = `photo-selection/${ownerKey}/${projectKey}/og`;
+  const { originalUrl, displayUrl, thumbUrl } = await uploadImageVariantsByProvider({
+    file,
+    folder,
+    provider,
+  });
+
+  const previousOg = project.photoSelection?.ogImage || null;
+  project.photoSelection.ogImage = {
+    id: `psog_${Date.now()}_${Math.random().toString(16).slice(2)}`,
+    url: displayUrl,
+    originalUrl,
+    thumbUrl,
+    originalName: file.originalname || "",
+    mimeType: file.mimetype || "",
+  };
+  await project.save();
+
+  const oldUrls = [previousOg?.url, previousOg?.originalUrl, previousOg?.thumbUrl]
+    .map((url) => objectKeyFromUrl(url))
+    .filter(Boolean);
+  if (oldUrls.length) {
+    await Promise.all(oldUrls.map((key) => deleteObjectAtKey({ key, provider }).catch(() => {})));
+  }
+
+  return { ogImage: project.photoSelection.ogImage, project };
+}
+
 function objectKeyFromUrl(url) {
   if (!url || typeof url !== "string") return "";
   try {
@@ -400,6 +436,7 @@ module.exports = {
   preparePhotoDirectUploads,
   commitPhotoDirectUploads,
   updatePhoto,
+  uploadPhotoSelectionOgImage,
   deletePhoto,
   deletePhotoSelectionProject,
   publishProject,

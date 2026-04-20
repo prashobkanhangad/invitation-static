@@ -61,6 +61,11 @@ type SelectionProject = {
     visibleToClient: number;
     hidden: number;
   };
+  ogImage: {
+    url: string;
+    originalUrl: string;
+    label: string;
+  } | null;
   photos: SelectionPhoto[];
 };
 
@@ -89,7 +94,6 @@ export default function StudioPhotoSelectionSection() {
   const [newProjectPinVisible, setNewProjectPinVisible] = useState(false);
   const [uploadModalOpen, setUploadModalOpen] = useState(false);
   const [uploadModalFiles, setUploadModalFiles] = useState<File[]>([]);
-  const [uploadModalPreviewUrls, setUploadModalPreviewUrls] = useState<string[]>([]);
   const [uploadModalTabChoice, setUploadModalTabChoice] = useState("");
   const [uploadModalSubmitting, setUploadModalSubmitting] = useState(false);
   const [uploadModalProgress, setUploadModalProgress] = useState(0);
@@ -101,8 +105,11 @@ export default function StudioPhotoSelectionSection() {
   const [copiedProjectId, setCopiedProjectId] = useState<string | null>(null);
   const [deletingPhotoId, setDeletingPhotoId] = useState<string | null>(null);
   const [deletingTabId, setDeletingTabId] = useState<string | null>(null);
+  const [ogImageUploading, setOgImageUploading] = useState(false);
+  const [ogImageUploadError, setOgImageUploadError] = useState<string | null>(null);
 
   const uploadModalInputId = useId();
+  const ogImageInputId = useId();
 
   const mapApiProjectToUi = (p: any): SelectionProject => {
     const photos = Array.isArray(p?.photoSelection?.photos)
@@ -123,6 +130,15 @@ export default function StudioPhotoSelectionSection() {
           label: String(t.label || "Tab"),
         }))
       : [];
+    const ogRaw = p?.photoSelection?.ogImage;
+    const ogImage =
+      ogRaw && typeof ogRaw === "object" && typeof ogRaw.url === "string" && ogRaw.url.trim()
+        ? {
+            url: String(ogRaw.url),
+            originalUrl: String(ogRaw.originalUrl || ""),
+            label: String(ogRaw.originalName || "OG image"),
+          }
+        : null;
     return {
       id: String(p?._id ?? p?.id ?? ""),
       name: String(p?.name ?? "Untitled project"),
@@ -138,6 +154,7 @@ export default function StudioPhotoSelectionSection() {
         visibleToClient: photos.length,
         hidden: 0,
       },
+      ogImage,
       photos,
     };
   };
@@ -211,13 +228,10 @@ export default function StudioPhotoSelectionSection() {
     setStudioFilterTabId("__all__");
     setPinDraftInput("");
     setPinSettingsMessage(null);
+    setOgImageUploadError(null);
     setWorkspacePinVisible(false);
     if (!activeProjectId) {
       setUploadModalOpen(false);
-      setUploadModalPreviewUrls((prev) => {
-        prev.forEach((u) => URL.revokeObjectURL(u));
-        return [];
-      });
       setUploadModalFiles([]);
       setUploadModalTabChoice("");
     }
@@ -311,6 +325,46 @@ export default function StudioPhotoSelectionSection() {
       window.alert(e instanceof Error ? e.message : "Failed to delete photo");
     } finally {
       setDeletingPhotoId(null);
+    }
+  };
+
+  const uploadSelectionOgImage = async (file: File) => {
+    if (!activeProjectId) return;
+    setOgImageUploadError(null);
+    setOgImageUploading(true);
+    try {
+      const formData = new FormData();
+      formData.append("image", file);
+      const resp = await studioApiFetch<{ ogImage?: any; project?: any }>(
+        `/api/studio/photo-selection/projects/${encodeURIComponent(activeProjectId)}/og-image`,
+        {
+          method: "POST",
+          formData,
+        }
+      );
+      const mapped = resp?.project ? mapApiProjectToUi(resp.project) : null;
+      setProjects((prev) =>
+        prev.map((p) => {
+          if (p.id !== activeProjectId) return p;
+          if (mapped) return { ...p, ...mapped };
+          const og = resp?.ogImage;
+          if (og && typeof og === "object" && typeof og.url === "string" && og.url.trim()) {
+            return {
+              ...p,
+              ogImage: {
+                url: String(og.url),
+                originalUrl: String(og.originalUrl || ""),
+                label: String(og.originalName || "OG image"),
+              },
+            };
+          }
+          return p;
+        })
+      );
+    } catch (e) {
+      setOgImageUploadError(e instanceof Error ? e.message : "Failed to upload OG image");
+    } finally {
+      setOgImageUploading(false);
     }
   };
 
@@ -543,10 +597,6 @@ export default function StudioPhotoSelectionSection() {
 
   const openUploadModal = () => {
     setUploadModalFiles([]);
-    setUploadModalPreviewUrls((prev) => {
-      prev.forEach((u) => URL.revokeObjectURL(u));
-      return [];
-    });
     setUploadModalTabChoice("");
     setUploadModalError(null);
     setUploadModalSubmitting(false);
@@ -557,10 +607,6 @@ export default function StudioPhotoSelectionSection() {
   const closeUploadModal = () => {
     if (uploadModalSubmitting) return;
     setUploadModalOpen(false);
-    setUploadModalPreviewUrls((prev) => {
-      prev.forEach((u) => URL.revokeObjectURL(u));
-      return [];
-    });
     setUploadModalFiles([]);
     setUploadModalTabChoice("");
     setUploadModalError(null);
@@ -572,16 +618,9 @@ export default function StudioPhotoSelectionSection() {
     if (!fileList?.length) return;
     const next = Array.from(fileList);
     setUploadModalFiles((prev) => [...prev, ...next]);
-    const urls = next.map((f) => URL.createObjectURL(f));
-    setUploadModalPreviewUrls((prev) => [...prev, ...urls]);
   };
 
   const removeModalFileAt = (index: number) => {
-    setUploadModalPreviewUrls((prev) => {
-      const url = prev[index];
-      if (url) URL.revokeObjectURL(url);
-      return prev.filter((_, i) => i !== index);
-    });
     setUploadModalFiles((prev) => prev.filter((_, i) => i !== index));
   };
 
@@ -645,6 +684,7 @@ export default function StudioPhotoSelectionSection() {
         visibleToClient: 0,
         hidden: 0,
       },
+      ogImage: null,
       photos: [],
     };
     try {
@@ -955,15 +995,20 @@ export default function StudioPhotoSelectionSection() {
                   <p className="text-sm font-semibold text-zinc-900">
                     {uploadModalFiles.length} file{uploadModalFiles.length === 1 ? "" : "s"} selected
                   </p>
-                  <ul className="mt-3 grid grid-cols-4 gap-2 sm:grid-cols-5">
+                  <ul className="mt-3 max-h-52 space-y-2 overflow-y-auto rounded-xl border border-zinc-200 bg-zinc-50 p-2">
                     {uploadModalFiles.map((file, idx) => (
-                      <li key={`${file.name}-${idx}`} className="group relative aspect-square overflow-hidden rounded-xl bg-zinc-100 ring-1 ring-zinc-200/80">
-                        <img alt="" src={uploadModalPreviewUrls[idx]} className="h-full w-full object-cover" />
+                      <li
+                        key={`${file.name}-${idx}`}
+                        className="flex items-center justify-between gap-2 rounded-lg bg-white px-3 py-2 ring-1 ring-zinc-200/80"
+                      >
+                        <span className="min-w-0 truncate text-sm text-zinc-800" title={file.name}>
+                          {file.name}
+                        </span>
                         <button
                           type="button"
                           onClick={() => removeModalFileAt(idx)}
                           disabled={uploadModalSubmitting}
-                          className="absolute right-1 top-1 rounded-full bg-black/60 p-1 text-white opacity-0 transition group-hover:opacity-100"
+                          className="inline-flex h-7 w-7 items-center justify-center rounded-full text-zinc-500 transition hover:bg-zinc-100 hover:text-zinc-800"
                           aria-label={`Remove ${file.name}`}
                         >
                           <X className="h-3.5 w-3.5" strokeWidth={2} />
@@ -1113,6 +1158,53 @@ export default function StudioPhotoSelectionSection() {
                   Add
                 </PrimaryButton>
               </div>
+            </div>
+
+            <div className="rounded-2xl border border-zinc-200/80 bg-white p-5 shadow-sm">
+              <div className="flex items-start gap-2">
+                <ImagePlus className="mt-0.5 h-5 w-5 shrink-0 text-zinc-700" strokeWidth={1.75} />
+                <div className="min-w-0">
+                  <p className="text-sm font-semibold text-zinc-900">OG image for public link</p>
+                  <p className="mt-1 text-xs leading-relaxed text-zinc-600">
+                    Upload a custom social preview image for `/photos/...` shares. If not uploaded, no OG image is sent.
+                  </p>
+                </div>
+              </div>
+              {p.ogImage?.url ? (
+                <div className="mt-4 overflow-hidden rounded-xl border border-zinc-200 bg-zinc-50">
+                  <img src={p.ogImage.url} alt={p.ogImage.label || "OG image"} className="h-36 w-full object-cover" />
+                </div>
+              ) : (
+                <p className="mt-4 rounded-xl border border-dashed border-zinc-300 bg-zinc-50 px-3 py-4 text-xs text-zinc-500">
+                  No OG image uploaded yet.
+                </p>
+              )}
+              <div className="mt-4">
+                <label
+                  htmlFor={ogImageInputId}
+                  className={[
+                    "inline-flex h-10 items-center justify-center rounded-xl px-4 text-sm font-semibold text-white",
+                    ogImageUploading ? "cursor-not-allowed bg-zinc-500" : "cursor-pointer bg-zinc-900 hover:bg-zinc-800",
+                  ].join(" ")}
+                >
+                  {ogImageUploading ? "Uploading..." : p.ogImage ? "Replace OG image" : "Upload OG image"}
+                </label>
+                <input
+                  id={ogImageInputId}
+                  type="file"
+                  accept="image/*"
+                  className="sr-only"
+                  disabled={ogImageUploading}
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file) void uploadSelectionOgImage(file);
+                    e.target.value = "";
+                  }}
+                />
+              </div>
+              {ogImageUploadError ? (
+                <p className="mt-2 text-xs font-medium text-red-600">{ogImageUploadError}</p>
+              ) : null}
             </div>
 
             <div className="rounded-2xl border border-zinc-200/80 bg-white p-5 shadow-sm">

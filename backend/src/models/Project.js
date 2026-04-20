@@ -41,6 +41,7 @@ const photoSelectionSchema = new mongoose.Schema(
     goal: { type: Number, default: 0 },
     clientTabs: { type: [photoSelectionTabSchema], default: [] },
     photos: { type: [photoSelectionPhotoSchema], default: [] },
+    ogImage: { type: clientProjectImageSchema, default: null },
     published: { type: Boolean, default: false },
     publishedAt: { type: Date, default: null },
     /** When true, public `/photos/{slug}` (and share link) require PIN + short-lived access token. */

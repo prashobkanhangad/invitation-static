@@ -88,12 +88,15 @@ export default function PublicPhotoSelectionScreen({
   const [downloadBusy, setDownloadBusy] = useState<"original" | "optimized" | null>(null);
   const [lightboxOriginalSizeLabel, setLightboxOriginalSizeLabel] = useState<string>("");
   const [lightboxOptimizedSizeLabel, setLightboxOptimizedSizeLabel] = useState<string>("");
+  const [gridFallbackToOriginalById, setGridFallbackToOriginalById] = useState<Record<string, boolean>>({});
+  const [lightboxFallbackToOriginal, setLightboxFallbackToOriginal] = useState(false);
 
   useEffect(() => {
     setSelectedById(
       Object.fromEntries(photos.map((photo) => [photo.id, Boolean(photo.picked)]))
     );
     setFavById(Object.fromEntries(photos.map((photo) => [photo.id, Boolean(photo.fav)])));
+    setGridFallbackToOriginalById({});
   }, [photos]);
 
   const visiblePhotos = useMemo(() => {
@@ -109,6 +112,7 @@ export default function PublicPhotoSelectionScreen({
   const lightboxPhoto = lightboxPhotoId ? photos.find((p) => p.id === lightboxPhotoId) ?? null : null;
   useEffect(() => {
     if (!lightboxPhoto) setDownloadMenuOpen(false);
+    setLightboxFallbackToOriginal(false);
   }, [lightboxPhoto]);
 
   useEffect(() => {
@@ -328,10 +332,20 @@ export default function PublicPhotoSelectionScreen({
                         aria-label={`Open ${photo.label}`}
                       >
                         <img
-                          src={photo.url || photo.originalUrl || ""}
+                          src={
+                            gridFallbackToOriginalById[photo.id]
+                              ? photo.originalUrl || photo.url || ""
+                              : photo.url || photo.originalUrl || ""
+                          }
                           alt={photo.label}
                           loading="lazy"
                           decoding="async"
+                          onError={() => {
+                            if (!photo.originalUrl) return;
+                            setGridFallbackToOriginalById((prev) =>
+                              prev[photo.id] ? prev : { ...prev, [photo.id]: true }
+                            );
+                          }}
                           className="absolute inset-0 h-full w-full object-cover"
                         />
                         <span className="absolute inset-0 bg-gradient-to-t from-black/35 via-transparent to-transparent" />
@@ -489,9 +503,17 @@ export default function PublicPhotoSelectionScreen({
             <div className="overflow-hidden rounded-2xl bg-black ring-1 ring-white/20">
               <div className="relative h-[70vh] w-full">
                 <img
-                  src={lightboxPhoto.url || lightboxPhoto.originalUrl || ""}
+                  src={
+                    lightboxFallbackToOriginal
+                      ? lightboxPhoto.originalUrl || lightboxPhoto.url || ""
+                      : lightboxPhoto.url || lightboxPhoto.originalUrl || ""
+                  }
                   alt={lightboxPhoto.label}
                   decoding="async"
+                  onError={() => {
+                    if (!lightboxPhoto?.originalUrl) return;
+                    setLightboxFallbackToOriginal(true);
+                  }}
                   className="absolute inset-0 h-full w-full object-contain"
                 />
               </div>

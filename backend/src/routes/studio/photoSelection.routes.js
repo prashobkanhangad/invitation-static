@@ -18,6 +18,7 @@ router.post(
   studioPhotoSelectionController.commitPhotoDirectUpload
 );
 router.post("/projects/:projectId/photos", uploadMemory.array("images", 300), studioPhotoSelectionController.uploadPhotos);
+router.post("/projects/:projectId/og-image", uploadMemory.single("image"), studioPhotoSelectionController.uploadOgImage);
 router.patch("/projects/:projectId/photos/:photoId", studioPhotoSelectionController.updatePhoto);
 router.delete("/projects/:projectId/photos/:photoId", studioPhotoSelectionController.deletePhoto);
 router.post("/projects/:projectId/publish", studioPhotoSelectionController.publishProject);

@@ -12,7 +12,7 @@ type PublicPhotoSelectionMetadataPayload = {
     studioName?: string;
   };
   photoSelection?: {
-    photos?: Array<{ url?: string }>;
+    ogImage?: { url?: string };
   };
 };
 
@@ -58,7 +58,7 @@ export async function generateMetadata({ params }: LayoutProps): Promise<Metadat
   const projectName = String(payload?.project?.name ?? "");
   const studioName = String(payload?.project?.studioName ?? "");
   const { title, description } = buildTitleAndDescription(projectName, studioName);
-  const firstPhotoUrl = absoluteUrl(String(payload?.photoSelection?.photos?.[0]?.url ?? ""));
+  const ogImageUrl = absoluteUrl(String(payload?.photoSelection?.ogImage?.url ?? ""));
 
   return {
     metadataBase: new URL(SITE_ORIGIN),
@@ -73,13 +73,13 @@ export async function generateMetadata({ params }: LayoutProps): Promise<Metadat
       url: canonicalUrl,
       siteName: "Invyto",
       type: "website",
-      ...(firstPhotoUrl ? { images: [{ url: firstPhotoUrl }] } : {}),
+      ...(ogImageUrl ? { images: [{ url: ogImageUrl }] } : {}),
     },
     twitter: {
       card: "summary_large_image",
       title,
       description,
-      ...(firstPhotoUrl ? { images: [firstPhotoUrl] } : {}),
+      ...(ogImageUrl ? { images: [ogImageUrl] } : {}),
     },
   };
 }
