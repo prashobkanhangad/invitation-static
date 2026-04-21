@@ -6,6 +6,7 @@ import PublicPhotoSelectionScreen from "@/components/client/PublicPhotoSelection
 import { apiFetch } from "@/utils/api";
 
 const PUBLIC_PHOTO_SELECTION_PAGE_LIMIT = 30;
+const ALL_TAB_ID = "__all__";
 
 type SelectionPhoto = {
   id: string;
@@ -77,6 +78,8 @@ export default function PublicPhotoSelectionPage() {
     Array<{ id: string; label: string }>
   >([]);
   const [selectionPhotos, setSelectionPhotos] = useState<SelectionPhoto[]>([]);
+  const [selectionActiveTabId, setSelectionActiveTabId] =
+    useState<string>(ALL_TAB_ID);
   const [selectionNextCursor, setSelectionNextCursor] = useState<string | null>(
     null,
   );
@@ -99,6 +102,7 @@ export default function PublicPhotoSelectionPage() {
     setPinGate(false);
     setPinInput("");
     setPinError(null);
+    setSelectionActiveTabId(ALL_TAB_ID);
   }, [slug]);
 
   const applyPayload = useCallback(
@@ -188,9 +192,11 @@ export default function PublicPhotoSelectionPage() {
       const qs = new URLSearchParams();
       qs.set("limit", String(PUBLIC_PHOTO_SELECTION_PAGE_LIMIT));
       if (cursor) qs.set("cursor", cursor);
+      if (selectionActiveTabId !== ALL_TAB_ID)
+        qs.set("tabId", selectionActiveTabId);
       return `/api/public/photos/${encodeURIComponent(slug || "")}?${qs.toString()}`;
     },
-    [slug],
+    [slug, selectionActiveTabId],
   );
 
   const selectionStatsPath = useCallback(
@@ -283,7 +289,14 @@ export default function PublicPhotoSelectionPage() {
     return () => {
       cancelled = true;
     };
-  }, [slug, accessToken, applyPayload, selectionPath, selectionStatsPath]);
+  }, [
+    slug,
+    accessToken,
+    applyPayload,
+    selectionPath,
+    selectionStatsPath,
+    selectionActiveTabId,
+  ]);
 
   const submitPin = async () => {
     if (!slug?.trim()) return;
@@ -405,6 +418,8 @@ export default function PublicPhotoSelectionPage() {
       projectName={selectionProjectName}
       tabs={selectionTabs}
       photos={selectionPhotos}
+      activeTabId={selectionActiveTabId}
+      onTabChange={setSelectionActiveTabId}
       hasMorePhotos={selectionHasMore}
       loadingMorePhotos={selectionLoadingMore}
       onLoadMorePhotos={loadMorePhotos}

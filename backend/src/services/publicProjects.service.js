@@ -60,9 +60,18 @@ function buildPublicPhotoSelectionPage(project, paginationInput) {
     return { photoSelection: null, photoSelectionPage: null };
   }
 
-  const allPhotos = Array.isArray(rawSelection.photos)
+  const rawPhotos = Array.isArray(rawSelection.photos)
     ? rawSelection.photos
     : [];
+  const tabId =
+    typeof paginationInput?.tabId === "string" &&
+    paginationInput.tabId.trim() &&
+    paginationInput.tabId !== "__all__"
+      ? paginationInput.tabId.trim()
+      : null;
+  const allPhotos = tabId
+    ? rawPhotos.filter((photo) => String(photo?.tabId || "") === tabId)
+    : rawPhotos;
   const limit = normalizePublicPhotoSelectionLimit(paginationInput?.limit);
   const requestedOffset = normalizePublicPhotoSelectionOffset(
     paginationInput?.cursor,

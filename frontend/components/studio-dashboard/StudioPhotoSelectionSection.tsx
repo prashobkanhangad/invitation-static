@@ -1,6 +1,13 @@
 "use client";
 
-import { useEffect, useId, useMemo, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useId,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import {
   ArrowLeft,
   Check,
@@ -31,6 +38,7 @@ import { uploadPhotoSelectionDirect } from "@/utils/studioDirectUpload";
 
 const STUDIO_TABLE_SHIMMER =
   "bg-gradient-to-r from-zinc-200 via-zinc-50 to-zinc-200 bg-[length:200%_100%] animate-shimmer";
+const WORKSPACE_PHOTO_PAGE_SIZE = 60;
 
 type SelectionRoundBadge = { label: string; tone: "good" | "warn" | "neutral" };
 
@@ -123,6 +131,11 @@ export default function StudioPhotoSelectionSection() {
   const [bulkDeleteMode, setBulkDeleteMode] = useState(false);
   const [markedPhotoIds, setMarkedPhotoIds] = useState<string[]>([]);
   const [bulkDeletingPhotos, setBulkDeletingPhotos] = useState(false);
+  const [workspaceVisiblePhotoCount, setWorkspaceVisiblePhotoCount] = useState(
+    WORKSPACE_PHOTO_PAGE_SIZE,
+  );
+  const workspaceLoadMoreRef = useRef<HTMLDivElement | null>(null);
+  const workspaceAutoLoadBusyRef = useRef(false);
 
   const uploadModalInputId = useId();
   const ogImageInputId = useId();
@@ -270,6 +283,18 @@ export default function StudioPhotoSelectionSection() {
     () => new Set(markedPhotoIds),
     [markedPhotoIds],
   );
+  const displayedWorkspacePhotos = useMemo(
+    () => filteredWorkspacePhotos.slice(0, workspaceVisiblePhotoCount),
+    [filteredWorkspacePhotos, workspaceVisiblePhotoCount],
+  );
+  const hasMoreWorkspacePhotos =
+    displayedWorkspacePhotos.length < filteredWorkspacePhotos.length;
+
+  const loadMoreWorkspacePhotos = useCallback(() => {
+    setWorkspaceVisiblePhotoCount((n) =>
+      Math.min(n + WORKSPACE_PHOTO_PAGE_SIZE, filteredWorkspacePhotos.length),
+    );
+  }, [filteredWorkspacePhotos.length]);
 
   useEffect(() => {
     setStudioImagePreviewId(null);
@@ -287,7 +312,31 @@ export default function StudioPhotoSelectionSection() {
     }
     setBulkDeleteMode(false);
     setMarkedPhotoIds([]);
+    setWorkspaceVisiblePhotoCount(WORKSPACE_PHOTO_PAGE_SIZE);
   }, [activeProjectId]);
+
+  useEffect(() => {
+    setWorkspaceVisiblePhotoCount(WORKSPACE_PHOTO_PAGE_SIZE);
+  }, [studioFilterSelectedOnly, studioFilterFavouriteOnly, studioFilterTabId]);
+
+  useEffect(() => {
+    const el = workspaceLoadMoreRef.current;
+    if (!el || !hasMoreWorkspacePhotos) return;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        const hit = entries.some((entry) => entry.isIntersecting);
+        if (!hit || workspaceAutoLoadBusyRef.current) return;
+        workspaceAutoLoadBusyRef.current = true;
+        loadMoreWorkspacePhotos();
+        window.setTimeout(() => {
+          workspaceAutoLoadBusyRef.current = false;
+        }, 150);
+      },
+      { root: null, rootMargin: "320px 0px", threshold: 0 },
+    );
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [hasMoreWorkspacePhotos, loadMoreWorkspacePhotos]);
 
   useEffect(() => {
     if (!activeProject) return;
@@ -421,7 +470,7 @@ export default function StudioPhotoSelectionSection() {
   const markAllFilteredPhotos = () => {
     setMarkedPhotoIds((prev) => {
       const next = new Set(prev);
-      filteredWorkspacePhotos.forEach((photo) => next.add(photo.id));
+      displayedWorkspacePhotos.forEach((photo) => next.add(photo.id));
       return Array.from(next);
     });
   };
@@ -1621,6 +1670,12 @@ export default function StudioPhotoSelectionSection() {
           <section className="min-w-0 space-y-4 xl:order-1">
             <div className="flex flex-col gap-3 rounded-2xl border border-zinc-200/80 bg-white p-4 shadow-sm lg:flex-row lg:items-center lg:justify-between">
               <div className="flex flex-wrap items-center gap-2">
+                <span className="inline-flex h-10 items-center rounded-xl border border-zinc-200 bg-zinc-50 px-3 text-xs font-semibold text-zinc-700">
+                  Images: {filteredWorkspacePhotos.length}
+                  {filteredWorkspacePhotos.length !== p.photos.length
+                    ? ` / ${p.photos.length}`
+                    : ""}
+                </span>
                 <label className="inline-flex h-10 items-center gap-2 rounded-xl border border-zinc-200 bg-white px-3 text-xs font-semibold text-zinc-700">
                   <span>Tab</span>
                   <select
@@ -1693,7 +1748,7 @@ export default function StudioPhotoSelectionSection() {
                       type="button"
                       onClick={markAllFilteredPhotos}
                       disabled={
-                        filteredWorkspacePhotos.length === 0 ||
+                        displayedWorkspacePhotos.length === 0 ||
                         bulkDeletingPhotos
                       }
                       className="inline-flex h-10 items-center justify-center gap-2 rounded-xl border border-zinc-200 bg-white px-4 text-sm font-semibold text-zinc-900 shadow-sm hover:bg-zinc-50 disabled:cursor-not-allowed disabled:opacity-50"
@@ -1815,7 +1870,7 @@ export default function StudioPhotoSelectionSection() {
                 </div>
               ) : (
                 <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 md:grid-cols-6">
-                  {filteredWorkspacePhotos.map((t) => (
+                  {displayedWorkspacePhotos.map((t) => (
                     <div key={t.id} className="relative aspect-square w-full">
                       {bulkDeleteMode && markedPhotoIdSet.has(t.id) ? (
                         <span className="pointer-events-none absolute right-2 top-2 z-20 inline-flex h-7 items-center gap-1 rounded-full bg-rose-600 px-2 text-[10px] font-bold text-white shadow">
@@ -1914,6 +1969,26 @@ export default function StudioPhotoSelectionSection() {
                     ? "mark mode is on — tap tiles to mark photos, then delete all marked in one action."
                     : "expand icon opens a large preview; tap the tile to toggle picked."}
                 </p>
+                {filteredWorkspacePhotos.length > 0 ? (
+                  <div
+                    ref={workspaceLoadMoreRef}
+                    className="flex items-center gap-2"
+                  >
+                    <span>
+                      Showing {displayedWorkspacePhotos.length} of{" "}
+                      {filteredWorkspacePhotos.length}
+                    </span>
+                    {hasMoreWorkspacePhotos ? (
+                      <button
+                        type="button"
+                        onClick={loadMoreWorkspacePhotos}
+                        className="rounded-full border border-zinc-200 bg-white px-3 py-1 text-[11px] font-semibold text-zinc-700 hover:bg-zinc-50"
+                      >
+                        Load more
+                      </button>
+                    ) : null}
+                  </div>
+                ) : null}
               </div>
             </div>
           </section>

@@ -15,6 +15,7 @@ import type {
 } from "@/components/client/PublicAlbumScreen";
 
 const PUBLIC_PHOTO_SELECTION_PAGE_LIMIT = 30;
+const ALL_TAB_ID = "__all__";
 
 type SelectionPhoto = {
   id: string;
@@ -111,6 +112,8 @@ export default function ShareAlbumPage() {
   >([]);
   const [isPhotoSelectionShare, setIsPhotoSelectionShare] = useState(false);
   const [selectionPhotos, setSelectionPhotos] = useState<SelectionPhoto[]>([]);
+  const [selectionActiveTabId, setSelectionActiveTabId] =
+    useState<string>(ALL_TAB_ID);
   const [selectionNextCursor, setSelectionNextCursor] = useState<string | null>(
     null,
   );
@@ -141,6 +144,7 @@ export default function ShareAlbumPage() {
     setSelectionPinGate(false);
     setSelectionPinInput("");
     setSelectionPinError(null);
+    setSelectionActiveTabId(ALL_TAB_ID);
   }, [shareToken]);
 
   const selectionRequestPath = useCallback(
@@ -148,9 +152,11 @@ export default function ShareAlbumPage() {
       const qs = new URLSearchParams();
       qs.set("limit", String(PUBLIC_PHOTO_SELECTION_PAGE_LIMIT));
       if (cursor) qs.set("cursor", cursor);
+      if (selectionActiveTabId !== ALL_TAB_ID)
+        qs.set("tabId", selectionActiveTabId);
       return `/api/public/projects/${encodeURIComponent(shareToken || "")}?${qs.toString()}`;
     },
-    [shareToken],
+    [shareToken, selectionActiveTabId],
   );
 
   const selectionStatsPath = useCallback(
@@ -409,6 +415,7 @@ export default function ShareAlbumPage() {
     selectionStatsPath,
     mapSelectionPhotos,
     applySelectionPayload,
+    selectionActiveTabId,
   ]);
 
   const submitSelectionPin = useCallback(async () => {
@@ -543,6 +550,8 @@ export default function ShareAlbumPage() {
       projectName={selectionProjectName}
       tabs={selectionTabs}
       photos={selectionPhotos}
+      activeTabId={selectionActiveTabId}
+      onTabChange={setSelectionActiveTabId}
       hasMorePhotos={selectionHasMore}
       loadingMorePhotos={selectionLoadingMore}
       onLoadMorePhotos={loadMoreSelectionPhotos}

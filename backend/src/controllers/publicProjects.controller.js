@@ -3,12 +3,14 @@ const publicProjectsService = require("../services/publicProjects.service");
 function photoSelectionPaginationFromQuery(query) {
   const limitRaw = query?.limit;
   const cursorRaw = query?.cursor;
+  const tabIdRaw = query?.tabId;
   return {
     limit:
       typeof limitRaw === "string" || typeof limitRaw === "number"
         ? Number.parseInt(String(limitRaw), 10)
         : undefined,
     cursor: typeof cursorRaw === "string" ? cursorRaw : undefined,
+    tabId: typeof tabIdRaw === "string" ? tabIdRaw : undefined,
   };
 }
 

@@ -51,6 +51,8 @@ type Props = {
   projectName: string;
   tabs: PublicSelectionTab[];
   photos: PublicSelectionPhoto[];
+  activeTabId: string;
+  onTabChange: (tabId: string) => void;
   hasMorePhotos?: boolean;
   loadingMorePhotos?: boolean;
   onLoadMorePhotos?: () => void | Promise<void>;
@@ -89,6 +91,8 @@ export default function PublicPhotoSelectionScreen({
   projectName,
   tabs,
   photos,
+  activeTabId,
+  onTabChange,
   hasMorePhotos = false,
   loadingMorePhotos = false,
   onLoadMorePhotos,
@@ -96,7 +100,6 @@ export default function PublicPhotoSelectionScreen({
   selectedPhotoCount = null,
   onSelectedCountDelta,
 }: Props) {
-  const [activeTabId, setActiveTabId] = useState<string>(ALL_TAB_ID);
   const [lightboxPhotoId, setLightboxPhotoId] = useState<string | null>(null);
   const [selectedById, setSelectedById] = useState<Record<string, boolean>>({});
   const [favById, setFavById] = useState<Record<string, boolean>>({});
@@ -141,10 +144,7 @@ export default function PublicPhotoSelectionScreen({
     setGridFallbackToOriginalById({});
   }, [photos]);
 
-  const photosForActiveTab = useMemo(() => {
-    if (activeTabId === ALL_TAB_ID) return photos;
-    return photos.filter((photo) => photo.tabId === activeTabId);
-  }, [activeTabId, photos]);
+  const photosForActiveTab = photos;
 
   useEffect(() => {
     loadingMoreRef.current = loadingMorePhotos;
@@ -177,23 +177,35 @@ export default function PublicPhotoSelectionScreen({
 
   useEffect(() => {
     if (
-      activeTabId !== ALL_TAB_ID &&
-      photosForActiveTab.length === 0 &&
-      hasMorePhotos &&
-      !loadingMorePhotos &&
-      onLoadMorePhotos
+      !hasMorePhotos ||
+      loadingMorePhotos ||
+      !onLoadMorePhotos ||
+      loadMoreBusyRef.current ||
+      typeof window === "undefined"
     ) {
-      loadMoreBusyRef.current = true;
-      void Promise.resolve(onLoadMorePhotos()).finally(() => {
-        if (!loadingMoreRef.current) loadMoreBusyRef.current = false;
-      });
+      return;
     }
+
+    const doc = document.documentElement;
+    const viewportH = window.innerHeight || doc.clientHeight || 0;
+    const pageH = Math.max(
+      doc.scrollHeight,
+      document.body?.scrollHeight || 0,
+      doc.offsetHeight,
+      document.body?.offsetHeight || 0,
+    );
+    const notScrollableYet = pageH <= viewportH + 40;
+    if (!notScrollableYet) return;
+
+    loadMoreBusyRef.current = true;
+    void Promise.resolve(onLoadMorePhotos()).finally(() => {
+      if (!loadingMoreRef.current) loadMoreBusyRef.current = false;
+    });
   }, [
-    activeTabId,
-    photosForActiveTab.length,
     hasMorePhotos,
     loadingMorePhotos,
     onLoadMorePhotos,
+    photosForActiveTab.length,
   ]);
 
   const selectedCount = useMemo(
@@ -403,7 +415,7 @@ export default function PublicPhotoSelectionScreen({
               <div className="mb-3 flex gap-2 overflow-x-auto pb-1">
                 <button
                   type="button"
-                  onClick={() => setActiveTabId(ALL_TAB_ID)}
+                  onClick={() => onTabChange(ALL_TAB_ID)}
                   className={[
                     "shrink-0 rounded-full px-4 py-2 text-sm font-semibold transition",
                     activeTabId === ALL_TAB_ID
@@ -417,7 +429,7 @@ export default function PublicPhotoSelectionScreen({
                   <button
                     key={tab.id}
                     type="button"
-                    onClick={() => setActiveTabId(tab.id)}
+                    onClick={() => onTabChange(tab.id)}
                     className={[
                       "shrink-0 rounded-full px-4 py-2 text-sm font-semibold transition",
                       activeTabId === tab.id
@@ -531,11 +543,21 @@ export default function PublicPhotoSelectionScreen({
                       ref={loadMoreSentinelRef}
                       className="flex min-h-10 items-center justify-center py-3"
                     >
-                      <span className="text-xs text-stone-400">
-                        {loadingMorePhotos
-                          ? "Loading more photos..."
-                          : `Showing ${photosForActiveTab.length} loaded photos`}
-                      </span>
+                      {hasMorePhotos && !loadingMorePhotos ? (
+                        <button
+                          type="button"
+                          onClick={() => void onLoadMorePhotos?.()}
+                          className="rounded-full border border-stone-200 bg-white px-3 py-1.5 text-xs font-semibold text-stone-600 hover:bg-stone-50"
+                        >
+                          Load more
+                        </button>
+                      ) : (
+                        <span className="text-xs text-stone-400">
+                          {loadingMorePhotos
+                            ? "Loading more photos..."
+                            : `Showing ${photosForActiveTab.length} loaded photos`}
+                        </span>
+                      )}
                     </div>
                   ) : null}
                 </>
