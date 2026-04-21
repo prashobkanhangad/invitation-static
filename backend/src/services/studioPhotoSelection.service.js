@@ -19,7 +19,10 @@ async function ensureUniqueProjectSlug(project) {
   if (!base) base = "selection";
   let candidate = base;
   for (let n = 0; n < 100; n += 1) {
-    const clash = await Project.findOne({ slug: candidate, _id: { $ne: project._id } });
+    const clash = await Project.findOne({
+      slug: candidate,
+      _id: { $ne: project._id },
+    });
     if (!clash) return candidate;
     candidate = `${base}-${n + 1}`;
   }
@@ -32,7 +35,11 @@ async function ensureUniqueProjectSlug(project) {
  */
 async function ensureSlugForPublishedPhotoSelection(project) {
   const photos = project.photoSelection?.photos || [];
-  if (!project.photoSelection?.published || project.slug || photos.length === 0) {
+  if (
+    !project.photoSelection?.published ||
+    project.slug ||
+    photos.length === 0
+  ) {
     return;
   }
   project.slug = await ensureUniqueProjectSlug(project);
@@ -52,10 +59,16 @@ const MAX_DIRECT_FILE_BYTES = 100 * 1024 * 1024;
 const MAX_DIRECT_FILES_PER_BATCH = 120;
 
 async function getStudioProject(user, projectId) {
+  const q = studioProjectQuery(user, projectId);
+  if (!q) return null;
+  return Project.findOne(q);
+}
+
+function studioProjectQuery(user, projectId) {
   if (!mongoose.Types.ObjectId.isValid(projectId)) return null;
   const q = { _id: projectId };
   if (user.role === "studio") q.studioUser = user.id;
-  return Project.findOne(q);
+  return q;
 }
 
 function isTruthyPinEnabled(v) {
@@ -127,7 +140,11 @@ async function updateProject(user, projectId, payload) {
   if (Array.isArray(clientTabs)) {
     project.photoSelection.clientTabs = clientTabs
       .filter((t) => t && typeof t.id === "string")
-      .map((t, i) => ({ id: t.id, label: String(t.label || ""), order: Number(t.order ?? i) }));
+      .map((t, i) => ({
+        id: t.id,
+        label: String(t.label || ""),
+        order: Number(t.order ?? i),
+      }));
   }
 
   if (typeof pinEnabled === "boolean") {
@@ -141,12 +158,22 @@ async function updateProject(user, projectId, payload) {
         if (checked.error) return checked;
         project.photoSelection.pinHash = hashPhotoSelectionPin(checked.pin);
       } else if (!project.photoSelection.pinHash) {
-        return { error: { status: 400, message: "Enter a PIN (4–8 digits) to enable protection" } };
+        return {
+          error: {
+            status: 400,
+            message: "Enter a PIN (4–8 digits) to enable protection",
+          },
+        };
       }
     }
   } else if (typeof pin === "string" && pin.trim()) {
     if (!project.photoSelection.pinEnabled) {
-      return { error: { status: 400, message: "Turn on PIN protection before setting a PIN" } };
+      return {
+        error: {
+          status: 400,
+          message: "Turn on PIN protection before setting a PIN",
+        },
+      };
     }
     const checked = validateSelectionPin(pin);
     if (checked.error) return checked;
@@ -163,18 +190,20 @@ async function uploadPhotos(user, projectId, files, payload, req) {
   if (!Array.isArray(files) || files.length === 0) {
     return { error: { status: 400, message: "No images uploaded" } };
   }
-  const tabId = typeof payload?.tabId === "string" && payload.tabId ? payload.tabId : null;
+  const tabId =
+    typeof payload?.tabId === "string" && payload.tabId ? payload.tabId : null;
   const provider = await getActiveStorageProvider();
   const ownerKey = String(user.id || "unknown-user");
   const projectKey = String(project._id || projectId);
   const folder = `photo-selection/${ownerKey}/${projectKey}`;
   const next = [];
   for (const f of files) {
-    const { originalUrl, displayUrl, thumbUrl } = await uploadImageVariantsByProvider({
-      file: f,
-      folder,
-      provider,
-    });
+    const { originalUrl, displayUrl, thumbUrl } =
+      await uploadImageVariantsByProvider({
+        file: f,
+        folder,
+        provider,
+      });
     next.push({
       id: `ps_${Date.now()}_${Math.random().toString(16).slice(2)}`,
       url: displayUrl,
@@ -187,7 +216,10 @@ async function uploadPhotos(user, projectId, files, payload, req) {
       fav: false,
     });
   }
-  project.photoSelection.photos = [...(project.photoSelection.photos || []), ...next];
+  project.photoSelection.photos = [
+    ...(project.photoSelection.photos || []),
+    ...next,
+  ];
   await project.save();
   return { photos: next };
 }
@@ -200,9 +232,15 @@ async function preparePhotoDirectUploads(user, projectId, payload) {
   const project = await getStudioProject(user, projectId);
   if (!project) return { error: { status: 404, message: "Project not found" } };
   const files = Array.isArray(payload?.files) ? payload.files : [];
-  if (files.length === 0) return { error: { status: 400, message: "No files requested" } };
+  if (files.length === 0)
+    return { error: { status: 400, message: "No files requested" } };
   if (files.length > MAX_DIRECT_FILES_PER_BATCH) {
-    return { error: { status: 400, message: `Maximum ${MAX_DIRECT_FILES_PER_BATCH} files per batch` } };
+    return {
+      error: {
+        status: 400,
+        message: `Maximum ${MAX_DIRECT_FILES_PER_BATCH} files per batch`,
+      },
+    };
   }
 
   const provider = await getActiveStorageProvider();
@@ -212,14 +250,29 @@ async function preparePhotoDirectUploads(user, projectId, payload) {
 
   const uploads = [];
   for (const meta of files) {
-    const originalName = typeof meta?.originalName === "string" ? meta.originalName : "image.jpg";
-    const mimeType = typeof meta?.mimeType === "string" ? meta.mimeType : "application/octet-stream";
+    const originalName =
+      typeof meta?.originalName === "string" ? meta.originalName : "image.jpg";
+    const mimeType =
+      typeof meta?.mimeType === "string"
+        ? meta.mimeType
+        : "application/octet-stream";
     const byteSize = Number(meta?.byteSize);
     if (!mimeType.startsWith("image/")) {
-      return { error: { status: 400, message: `Not an image: ${originalName}` } };
+      return {
+        error: { status: 400, message: `Not an image: ${originalName}` },
+      };
     }
-    if (!Number.isFinite(byteSize) || byteSize <= 0 || byteSize > MAX_DIRECT_FILE_BYTES) {
-      return { error: { status: 400, message: `Invalid or too large file: ${originalName} (max 100MB each)` } };
+    if (
+      !Number.isFinite(byteSize) ||
+      byteSize <= 0 ||
+      byteSize > MAX_DIRECT_FILE_BYTES
+    ) {
+      return {
+        error: {
+          status: 400,
+          message: `Invalid or too large file: ${originalName} (max 100MB each)`,
+        },
+      };
     }
     const key = `${prefix}/${crypto.randomBytes(14).toString("hex")}_${safeName(originalName)}`;
     const { uploadUrl, method, headers } = await createDirectUploadWriteUrl({
@@ -240,14 +293,26 @@ async function preparePhotoDirectUploads(user, projectId, payload) {
   return { uploads, expiresInSeconds: 1200 };
 }
 
-async function commitPhotoDirectUploads(user, projectId, payload, options = {}) {
-  const onProgress = typeof options?.onProgress === "function" ? options.onProgress : null;
+async function commitPhotoDirectUploads(
+  user,
+  projectId,
+  payload,
+  options = {},
+) {
+  const onProgress =
+    typeof options?.onProgress === "function" ? options.onProgress : null;
   const project = await getStudioProject(user, projectId);
   if (!project) return { error: { status: 404, message: "Project not found" } };
   const items = Array.isArray(payload?.items) ? payload.items : [];
-  if (items.length === 0) return { error: { status: 400, message: "No items to commit" } };
+  if (items.length === 0)
+    return { error: { status: 400, message: "No items to commit" } };
   if (items.length > MAX_DIRECT_FILES_PER_BATCH) {
-    return { error: { status: 400, message: `Maximum ${MAX_DIRECT_FILES_PER_BATCH} items per commit` } };
+    return {
+      error: {
+        status: 400,
+        message: `Maximum ${MAX_DIRECT_FILES_PER_BATCH} items per commit`,
+      },
+    };
   }
 
   const provider = await getActiveStorageProvider();
@@ -255,16 +320,24 @@ async function commitPhotoDirectUploads(user, projectId, payload, options = {}) 
   const projectKey = String(project._id);
   const expectedPrefix = stagingPrefixPhotoSelection(ownerKey, projectKey);
   const folder = `photo-selection/${ownerKey}/${projectKey}`;
-  const defaultTabId = typeof payload?.tabId === "string" && payload.tabId ? payload.tabId : null;
+  const defaultTabId =
+    typeof payload?.tabId === "string" && payload.tabId ? payload.tabId : null;
 
   const next = [];
-  if (onProgress) await onProgress({ total: items.length, done: 0, message: "Processing photos" });
+  if (onProgress)
+    await onProgress({
+      total: items.length,
+      done: 0,
+      message: "Processing photos",
+    });
 
   for (let i = 0; i < items.length; i += 1) {
     const item = items[i];
     const key = typeof item?.key === "string" ? item.key : "";
-    const originalName = typeof item?.originalName === "string" ? item.originalName : "image.jpg";
-    const mimeType = typeof item?.mimeType === "string" ? item.mimeType : "image/jpeg";
+    const originalName =
+      typeof item?.originalName === "string" ? item.originalName : "image.jpg";
+    const mimeType =
+      typeof item?.mimeType === "string" ? item.mimeType : "image/jpeg";
     const tabId =
       typeof item?.tabId === "string" && item.tabId ? item.tabId : defaultTabId;
 
@@ -276,22 +349,30 @@ async function commitPhotoDirectUploads(user, projectId, payload, options = {}) 
     try {
       buffer = await downloadObjectBuffer({ key, provider });
     } catch (e) {
-      return { error: { status: 400, message: `Could not read uploaded file: ${originalName}` } };
+      return {
+        error: {
+          status: 400,
+          message: `Could not read uploaded file: ${originalName}`,
+        },
+      };
     }
 
     try {
       await sharp(buffer).metadata();
     } catch {
       await deleteObjectAtKey({ key, provider }).catch(() => {});
-      return { error: { status: 400, message: `Not a valid image: ${originalName}` } };
+      return {
+        error: { status: 400, message: `Not a valid image: ${originalName}` },
+      };
     }
 
     const file = { buffer, originalname: originalName, mimetype: mimeType };
-    const { originalUrl, displayUrl, thumbUrl } = await uploadImageVariantsByProvider({
-      file,
-      folder,
-      provider,
-    });
+    const { originalUrl, displayUrl, thumbUrl } =
+      await uploadImageVariantsByProvider({
+        file,
+        folder,
+        provider,
+      });
 
     await deleteObjectAtKey({ key, provider }).catch(() => {});
 
@@ -306,10 +387,18 @@ async function commitPhotoDirectUploads(user, projectId, payload, options = {}) 
       picked: false,
       fav: false,
     });
-    if (onProgress) await onProgress({ total: items.length, done: i + 1, message: `Processed ${i + 1}/${items.length}` });
+    if (onProgress)
+      await onProgress({
+        total: items.length,
+        done: i + 1,
+        message: `Processed ${i + 1}/${items.length}`,
+      });
   }
 
-  project.photoSelection.photos = [...(project.photoSelection.photos || []), ...next];
+  project.photoSelection.photos = [
+    ...(project.photoSelection.photos || []),
+    ...next,
+  ];
   await project.save();
   return { photos: next };
 }
@@ -317,7 +406,9 @@ async function commitPhotoDirectUploads(user, projectId, payload, options = {}) 
 async function updatePhoto(user, projectId, photoId, payload) {
   const project = await getStudioProject(user, projectId);
   if (!project) return { error: { status: 404, message: "Project not found" } };
-  const photo = (project.photoSelection.photos || []).find((p) => p.id === photoId);
+  const photo = (project.photoSelection.photos || []).find(
+    (p) => p.id === photoId,
+  );
   if (!photo) return { error: { status: 404, message: "Photo not found" } };
   const { picked, fav, tabId } = payload || {};
   if (typeof picked === "boolean") photo.picked = picked;
@@ -330,17 +421,19 @@ async function updatePhoto(user, projectId, photoId, payload) {
 async function uploadPhotoSelectionOgImage(user, projectId, file) {
   const project = await getStudioProject(user, projectId);
   if (!project) return { error: { status: 404, message: "Project not found" } };
-  if (!file?.buffer) return { error: { status: 400, message: "Image file is required" } };
+  if (!file?.buffer)
+    return { error: { status: 400, message: "Image file is required" } };
 
   const provider = await getActiveStorageProvider();
   const ownerKey = String(user.id || "unknown-user");
   const projectKey = String(project._id || projectId);
   const folder = `photo-selection/${ownerKey}/${projectKey}/og`;
-  const { originalUrl, displayUrl, thumbUrl } = await uploadImageVariantsByProvider({
-    file,
-    folder,
-    provider,
-  });
+  const { originalUrl, displayUrl, thumbUrl } =
+    await uploadImageVariantsByProvider({
+      file,
+      folder,
+      provider,
+    });
 
   const previousOg = project.photoSelection?.ogImage || null;
   project.photoSelection.ogImage = {
@@ -353,11 +446,19 @@ async function uploadPhotoSelectionOgImage(user, projectId, file) {
   };
   await project.save();
 
-  const oldUrls = [previousOg?.url, previousOg?.originalUrl, previousOg?.thumbUrl]
+  const oldUrls = [
+    previousOg?.url,
+    previousOg?.originalUrl,
+    previousOg?.thumbUrl,
+  ]
     .map((url) => objectKeyFromUrl(url))
     .filter(Boolean);
   if (oldUrls.length) {
-    await Promise.all(oldUrls.map((key) => deleteObjectAtKey({ key, provider }).catch(() => {})));
+    await Promise.all(
+      oldUrls.map((key) =>
+        deleteObjectAtKey({ key, provider }).catch(() => {}),
+      ),
+    );
   }
 
   return { ogImage: project.photoSelection.ogImage, project };
@@ -380,16 +481,26 @@ function objectKeyFromUrl(url) {
 }
 
 async function deletePhoto(user, projectId, photoId) {
-  const project = await getStudioProject(user, projectId);
+  const q = studioProjectQuery(user, projectId);
+  if (!q) return { error: { status: 404, message: "Project not found" } };
+
+  const project = await Project.findOne(q, {
+    "photoSelection.photos.id": 1,
+    "photoSelection.photos.url": 1,
+    "photoSelection.photos.originalUrl": 1,
+    "photoSelection.photos.thumbUrl": 1,
+  });
   if (!project) return { error: { status: 404, message: "Project not found" } };
 
-  const photos = Array.isArray(project.photoSelection?.photos) ? project.photoSelection.photos : [];
-  const photoIndex = photos.findIndex((p) => p.id === photoId);
-  if (photoIndex < 0) return { error: { status: 404, message: "Photo not found" } };
+  const photos = Array.isArray(project.photoSelection?.photos)
+    ? project.photoSelection.photos
+    : [];
+  const photo = photos.find((p) => p.id === photoId);
+  if (!photo) return { error: { status: 404, message: "Photo not found" } };
 
-  const [photo] = photos.splice(photoIndex, 1);
-  project.photoSelection.photos = photos;
-  await project.save();
+  await Project.updateOne(q, {
+    $pull: { "photoSelection.photos": { id: photoId } },
+  });
 
   const provider = await getActiveStorageProvider();
   const maybeUrls = [photo?.url, photo?.originalUrl, photo?.thumbUrl];
@@ -397,7 +508,7 @@ async function deletePhoto(user, projectId, photoId) {
     maybeUrls
       .map((url) => objectKeyFromUrl(url))
       .filter(Boolean)
-      .map((key) => deleteObjectAtKey({ key, provider }).catch(() => {}))
+      .map((key) => deleteObjectAtKey({ key, provider }).catch(() => {})),
   );
 
   return { ok: true, photoId };
@@ -417,8 +528,10 @@ async function publishProject(user, projectId) {
   const project = await getStudioProject(user, projectId);
   if (!project) return { error: { status: 404, message: "Project not found" } };
   const photos = project.photoSelection?.photos || [];
-  if (photos.length === 0) return { error: { status: 400, message: "Add photos before publishing" } };
-  if (!project.shareToken) project.shareToken = crypto.randomBytes(24).toString("hex");
+  if (photos.length === 0)
+    return { error: { status: 400, message: "Add photos before publishing" } };
+  if (!project.shareToken)
+    project.shareToken = crypto.randomBytes(24).toString("hex");
   if (!project.slug) project.slug = await ensureUniqueProjectSlug(project);
   project.isPublished = true;
   project.photoSelection.published = true;

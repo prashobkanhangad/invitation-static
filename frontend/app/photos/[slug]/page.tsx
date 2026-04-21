@@ -44,6 +44,13 @@ type PublicPhotoSelectionPayload = {
   };
 };
 
+type PublicPhotoSelectionStatsPayload = {
+  photoSelectionStats?: {
+    totalPhotos?: number;
+    selectedPhotos?: number;
+  };
+};
+
 function storageKeyForSlug(slug: string) {
   return `invyto-photo-sel-access:slug:${encodeURIComponent(slug)}`;
 }
@@ -75,6 +82,12 @@ export default function PublicPhotoSelectionPage() {
   );
   const [selectionHasMore, setSelectionHasMore] = useState(false);
   const [selectionLoadingMore, setSelectionLoadingMore] = useState(false);
+  const [selectionTotalPhotos, setSelectionTotalPhotos] = useState<
+    number | null
+  >(null);
+  const [selectionSelectedPhotos, setSelectionSelectedPhotos] = useState<
+    number | null
+  >(null);
 
   useEffect(() => {
     if (!slug || !String(slug).trim()) return;
@@ -180,6 +193,12 @@ export default function PublicPhotoSelectionPage() {
     [slug],
   );
 
+  const selectionStatsPath = useCallback(
+    () =>
+      `/api/public/photos/${encodeURIComponent(slug || "")}/photo-selection/stats`,
+    [slug],
+  );
+
   useEffect(() => {
     let cancelled = false;
 
@@ -200,6 +219,8 @@ export default function PublicPhotoSelectionPage() {
       setSelectionHasMore(false);
       setSelectionNextCursor(null);
       setSelectionLoadingMore(false);
+      setSelectionTotalPhotos(null);
+      setSelectionSelectedPhotos(null);
 
       try {
         const data = await apiFetch<PublicPhotoSelectionPayload>(
@@ -211,6 +232,29 @@ export default function PublicPhotoSelectionPage() {
 
         if (cancelled) return;
         applyPayload(data, "replace");
+        try {
+          const stats = await apiFetch<PublicPhotoSelectionStatsPayload>(
+            selectionStatsPath(),
+            { token: accessToken || null },
+          );
+          if (!cancelled) {
+            setSelectionTotalPhotos(
+              typeof stats.photoSelectionStats?.totalPhotos === "number"
+                ? stats.photoSelectionStats.totalPhotos
+                : null,
+            );
+            setSelectionSelectedPhotos(
+              typeof stats.photoSelectionStats?.selectedPhotos === "number"
+                ? stats.photoSelectionStats.selectedPhotos
+                : null,
+            );
+          }
+        } catch {
+          if (!cancelled) {
+            setSelectionTotalPhotos(null);
+            setSelectionSelectedPhotos(null);
+          }
+        }
         setPinGate(false);
         setPinError(null);
       } catch (err) {
@@ -222,6 +266,8 @@ export default function PublicPhotoSelectionPage() {
           if (typeof window !== "undefined")
             sessionStorage.removeItem(storageKeyForSlug(slug));
           setAccessToken("");
+          setSelectionTotalPhotos(null);
+          setSelectionSelectedPhotos(null);
         } else {
           setError(
             e instanceof Error ? e.message : "Failed to load photo selection",
@@ -237,7 +283,7 @@ export default function PublicPhotoSelectionPage() {
     return () => {
       cancelled = true;
     };
-  }, [slug, accessToken, applyPayload, selectionPath]);
+  }, [slug, accessToken, applyPayload, selectionPath, selectionStatsPath]);
 
   const submitPin = async () => {
     if (!slug?.trim()) return;
@@ -297,6 +343,13 @@ export default function PublicPhotoSelectionPage() {
     applyPayload,
   ]);
 
+  const onSelectedCountDelta = useCallback((delta: number) => {
+    setSelectionSelectedPhotos((prev) => {
+      if (typeof prev !== "number") return prev;
+      return Math.max(0, prev + delta);
+    });
+  }, []);
+
   if (pinGate && slug) {
     return (
       <main className="min-h-screen bg-[#f7f4ef] antialiased text-stone-900">
@@ -355,6 +408,9 @@ export default function PublicPhotoSelectionPage() {
       hasMorePhotos={selectionHasMore}
       loadingMorePhotos={selectionLoadingMore}
       onLoadMorePhotos={loadMorePhotos}
+      totalPhotoCount={selectionTotalPhotos}
+      selectedPhotoCount={selectionSelectedPhotos}
+      onSelectedCountDelta={onSelectedCountDelta}
     />
   );
 }

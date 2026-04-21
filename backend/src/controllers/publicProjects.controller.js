@@ -173,6 +173,24 @@ async function getPublicPhotoSelectionBySlug(req, res) {
   }
 }
 
+async function getPublicPhotoSelectionStatsBySlug(req, res) {
+  try {
+    const accessToken = publicProjectsService.bearerFromAuthorizationHeader(
+      req.headers.authorization,
+    );
+    const result =
+      await publicProjectsService.getPublicPhotoSelectionStatsBySlug(
+        req.params.slug,
+        accessToken,
+      );
+    return sendResult(res, result);
+  } catch (err) {
+    // eslint-disable-next-line no-console
+    console.error(err);
+    return res.status(500).json({ message: "Server error" });
+  }
+}
+
 async function updatePhotoSelectionPhotoBySlug(req, res) {
   try {
     const accessToken = publicProjectsService.bearerFromAuthorizationHeader(
@@ -183,6 +201,24 @@ async function updatePhotoSelectionPhotoBySlug(req, res) {
         req.params.slug,
         req.params.photoId,
         req.body,
+        accessToken,
+      );
+    return sendResult(res, result);
+  } catch (err) {
+    // eslint-disable-next-line no-console
+    console.error(err);
+    return res.status(500).json({ message: "Server error" });
+  }
+}
+
+async function getPublicPhotoSelectionStatsByShareToken(req, res) {
+  try {
+    const accessToken = publicProjectsService.bearerFromAuthorizationHeader(
+      req.headers.authorization,
+    );
+    const result =
+      await publicProjectsService.getPublicPhotoSelectionStatsByShareToken(
+        req.params.shareToken,
         accessToken,
       );
     return sendResult(res, result);
@@ -308,6 +344,8 @@ module.exports = {
   downloadPhotoSelectionPhoto,
   downloadAlbumImage,
   getPublicPhotoSelectionBySlug,
+  getPublicPhotoSelectionStatsBySlug,
+  getPublicPhotoSelectionStatsByShareToken,
   updatePhotoSelectionPhotoBySlug,
   downloadPhotoSelectionPhotoBySlug,
   downloadAlbumImageBySlug,

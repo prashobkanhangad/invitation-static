@@ -54,6 +54,9 @@ type Props = {
   hasMorePhotos?: boolean;
   loadingMorePhotos?: boolean;
   onLoadMorePhotos?: () => void | Promise<void>;
+  totalPhotoCount?: number | null;
+  selectedPhotoCount?: number | null;
+  onSelectedCountDelta?: (delta: number) => void;
 };
 
 const ALL_TAB_ID = "__all__";
@@ -89,6 +92,9 @@ export default function PublicPhotoSelectionScreen({
   hasMorePhotos = false,
   loadingMorePhotos = false,
   onLoadMorePhotos,
+  totalPhotoCount = null,
+  selectedPhotoCount = null,
+  onSelectedCountDelta,
 }: Props) {
   const [activeTabId, setActiveTabId] = useState<string>(ALL_TAB_ID);
   const [lightboxPhotoId, setLightboxPhotoId] = useState<string | null>(null);
@@ -169,10 +175,35 @@ export default function PublicPhotoSelectionScreen({
     photosForActiveTab.length,
   ]);
 
+  useEffect(() => {
+    if (
+      activeTabId !== ALL_TAB_ID &&
+      photosForActiveTab.length === 0 &&
+      hasMorePhotos &&
+      !loadingMorePhotos &&
+      onLoadMorePhotos
+    ) {
+      loadMoreBusyRef.current = true;
+      void Promise.resolve(onLoadMorePhotos()).finally(() => {
+        if (!loadingMoreRef.current) loadMoreBusyRef.current = false;
+      });
+    }
+  }, [
+    activeTabId,
+    photosForActiveTab.length,
+    hasMorePhotos,
+    loadingMorePhotos,
+    onLoadMorePhotos,
+  ]);
+
   const selectedCount = useMemo(
     () => photos.filter((p) => selectedById[p.id]).length,
     [photos, selectedById],
   );
+  const headerSelectedCount =
+    typeof selectedPhotoCount === "number" ? selectedPhotoCount : selectedCount;
+  const headerTotalPhotoCount =
+    typeof totalPhotoCount === "number" ? totalPhotoCount : photos.length;
 
   const lightboxPhoto = lightboxPhotoId
     ? (photos.find((p) => p.id === lightboxPhotoId) ?? null)
@@ -229,13 +260,16 @@ export default function PublicPhotoSelectionScreen({
 
   const toggleSelected = (photoId: string) => {
     const nextPicked = !selectedById[photoId];
+    const delta = nextPicked ? 1 : -1;
     setSelectedById((prev) => ({ ...prev, [photoId]: nextPicked }));
+    onSelectedCountDelta?.(delta);
     void apiFetch(photoSelectionPhotoApiPath(publicLookup, photoId), {
       method: "PATCH",
       body: { picked: nextPicked },
       token: accessToken || null,
     }).catch(() => {
       setSelectedById((prev) => ({ ...prev, [photoId]: !nextPicked }));
+      onSelectedCountDelta?.(-delta);
       window.alert("Failed to save selection. Please try again.");
     });
   };
@@ -332,7 +366,7 @@ export default function PublicPhotoSelectionScreen({
                 </p>
               ) : null}
               <p className="mt-1.5 text-xs font-semibold uppercase tracking-wide text-stone-500">
-                {selectedCount} selected · {photos.length} photos
+                {headerSelectedCount} selected · {headerTotalPhotoCount} photos
               </p>
             </div>
           )}
@@ -396,7 +430,7 @@ export default function PublicPhotoSelectionScreen({
                 ))}
               </div>
 
-              {photosForActiveTab.length === 0 ? (
+              {photosForActiveTab.length === 0 && !hasMorePhotos ? (
                 <div className="rounded-2xl border border-dashed border-stone-300 bg-white/80 p-8 text-center text-sm text-stone-600">
                   No photos in this section yet.
                 </div>

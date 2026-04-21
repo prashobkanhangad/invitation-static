@@ -84,6 +84,16 @@ function buildPublicPhotoSelectionPage(project, paginationInput) {
   };
 }
 
+function buildPublicPhotoSelectionStats(project) {
+  const photos = Array.isArray(project?.photoSelection?.photos)
+    ? project.photoSelection.photos
+    : [];
+  return {
+    totalPhotos: photos.length,
+    selectedPhotos: photos.filter((photo) => Boolean(photo?.picked)).length,
+  };
+}
+
 function publicStudioDisplayName(project) {
   const u = project?.studioUser;
   if (!u || typeof u !== "object") return "";
@@ -605,6 +615,37 @@ async function verifyPhotoSelectionPinByShareToken(shareToken, plainPin) {
   };
 }
 
+async function getPublicPhotoSelectionStatsBySlug(rawSlug, accessToken) {
+  const slug = normalizeSlug(rawSlug);
+  if (!slug) return { error: { status: 400, message: "slug required" } };
+  const project = await Project.findOne({ slug, isPublished: true });
+  if (!project?.photoSelection)
+    return { error: { status: 404, message: "Project not found" } };
+  const pinGate = photoSelectionPin.assertPhotoSelectionPinAccess(
+    project,
+    accessToken,
+  );
+  if (pinGate.error) return pinGate;
+  return { photoSelectionStats: buildPublicPhotoSelectionStats(project) };
+}
+
+async function getPublicPhotoSelectionStatsByShareToken(
+  shareToken,
+  accessToken,
+) {
+  if (!shareToken)
+    return { error: { status: 400, message: "shareToken required" } };
+  const project = await Project.findOne({ shareToken, isPublished: true });
+  if (!project?.photoSelection)
+    return { error: { status: 404, message: "Project not found" } };
+  const pinGate = photoSelectionPin.assertPhotoSelectionPinAccess(
+    project,
+    accessToken,
+  );
+  if (pinGate.error) return pinGate;
+  return { photoSelectionStats: buildPublicPhotoSelectionStats(project) };
+}
+
 module.exports = {
   getPublicProjectByShareToken,
   getPublicProjectBySlug,
@@ -617,6 +658,8 @@ module.exports = {
   resolvePublicPhotoSelectionDownloadBySlug,
   verifyPhotoSelectionPinBySlug,
   verifyPhotoSelectionPinByShareToken,
+  getPublicPhotoSelectionStatsBySlug,
+  getPublicPhotoSelectionStatsByShareToken,
   bearerFromAuthorizationHeader:
     photoSelectionPin.bearerFromAuthorizationHeader,
 };

@@ -64,6 +64,13 @@ type SharePayload = {
   };
 };
 
+type PublicPhotoSelectionStatsPayload = {
+  photoSelectionStats?: {
+    totalPhotos?: number;
+    selectedPhotos?: number;
+  };
+};
+
 function storageKeyForShareToken(token: string) {
   return `invyto-photo-sel-access:share:${encodeURIComponent(token)}`;
 }
@@ -109,6 +116,12 @@ export default function ShareAlbumPage() {
   );
   const [selectionHasMore, setSelectionHasMore] = useState(false);
   const [selectionLoadingMore, setSelectionLoadingMore] = useState(false);
+  const [selectionTotalPhotos, setSelectionTotalPhotos] = useState<
+    number | null
+  >(null);
+  const [selectionSelectedPhotos, setSelectionSelectedPhotos] = useState<
+    number | null
+  >(null);
 
   const [selectionAccessToken, setSelectionAccessToken] = useState("");
   const [selectionPinGate, setSelectionPinGate] = useState(false);
@@ -137,6 +150,12 @@ export default function ShareAlbumPage() {
       if (cursor) qs.set("cursor", cursor);
       return `/api/public/projects/${encodeURIComponent(shareToken || "")}?${qs.toString()}`;
     },
+    [shareToken],
+  );
+
+  const selectionStatsPath = useCallback(
+    () =>
+      `/api/public/projects/${encodeURIComponent(shareToken || "")}/photo-selection/stats`,
     [shareToken],
   );
 
@@ -244,6 +263,8 @@ export default function ShareAlbumPage() {
       setSelectionNextCursor(null);
       setSelectionHasMore(false);
       setSelectionLoadingMore(false);
+      setSelectionTotalPhotos(null);
+      setSelectionSelectedPhotos(null);
 
       try {
         const data = await apiFetch<SharePayload>(selectionRequestPath(), {
@@ -287,11 +308,36 @@ export default function ShareAlbumPage() {
         setIsPhotoSelectionShare(Boolean(data.photoSelection));
         if (data.photoSelection) {
           applySelectionPayload(data, "replace");
+          try {
+            const stats = await apiFetch<PublicPhotoSelectionStatsPayload>(
+              selectionStatsPath(),
+              { token: selectionAccessToken || null },
+            );
+            if (!cancelled) {
+              setSelectionTotalPhotos(
+                typeof stats.photoSelectionStats?.totalPhotos === "number"
+                  ? stats.photoSelectionStats.totalPhotos
+                  : null,
+              );
+              setSelectionSelectedPhotos(
+                typeof stats.photoSelectionStats?.selectedPhotos === "number"
+                  ? stats.photoSelectionStats.selectedPhotos
+                  : null,
+              );
+            }
+          } catch {
+            if (!cancelled) {
+              setSelectionTotalPhotos(null);
+              setSelectionSelectedPhotos(null);
+            }
+          }
         } else {
           setSelectionTabs([]);
           setSelectionPhotos([]);
           setSelectionNextCursor(null);
           setSelectionHasMore(false);
+          setSelectionTotalPhotos(null);
+          setSelectionSelectedPhotos(null);
         }
         setTemplate(
           tpl
@@ -342,6 +388,8 @@ export default function ShareAlbumPage() {
           if (typeof window !== "undefined")
             sessionStorage.removeItem(storageKeyForShareToken(shareToken));
           setSelectionAccessToken("");
+          setSelectionTotalPhotos(null);
+          setSelectionSelectedPhotos(null);
         } else {
           setError(e instanceof Error ? e.message : "Failed to load share");
         }
@@ -358,6 +406,7 @@ export default function ShareAlbumPage() {
     shareToken,
     selectionAccessToken,
     selectionRequestPath,
+    selectionStatsPath,
     mapSelectionPhotos,
     applySelectionPayload,
   ]);
@@ -428,6 +477,13 @@ export default function ShareAlbumPage() {
     applySelectionPayload,
   ]);
 
+  const onSelectedCountDelta = useCallback((delta: number) => {
+    setSelectionSelectedPhotos((prev) => {
+      if (typeof prev !== "number") return prev;
+      return Math.max(0, prev + delta);
+    });
+  }, []);
+
   if (isPhotoSelectionShare && selectionPinGate && shareToken) {
     return (
       <main className="min-h-screen bg-[#f7f4ef] antialiased text-stone-900">
@@ -490,6 +546,9 @@ export default function ShareAlbumPage() {
       hasMorePhotos={selectionHasMore}
       loadingMorePhotos={selectionLoadingMore}
       onLoadMorePhotos={loadMoreSelectionPhotos}
+      totalPhotoCount={selectionTotalPhotos}
+      selectedPhotoCount={selectionSelectedPhotos}
+      onSelectedCountDelta={onSelectedCountDelta}
     />
   ) : (
     <PublicAlbumScreen
