@@ -5,6 +5,20 @@ import { useParams } from "next/navigation";
 import PublicPhotoSelectionScreen from "@/components/client/PublicPhotoSelectionScreen";
 import { apiFetch } from "@/utils/api";
 
+const PUBLIC_PHOTO_SELECTION_PAGE_LIMIT = 30;
+
+type SelectionPhoto = {
+  id: string;
+  url: string;
+  originalUrl: string | null;
+  tabId: string | null;
+  picked: boolean;
+  fav: boolean;
+  label: string;
+  fileName: string;
+  mimeType: string;
+};
+
 type PublicPhotoSelectionPayload = {
   project?: { name?: string; studioName?: string };
   photoSelection?: {
@@ -20,6 +34,13 @@ type PublicPhotoSelectionPayload = {
       originalName?: string;
       mimeType?: string;
     }>;
+  };
+  photoSelectionPage?: {
+    cursor?: string;
+    nextCursor?: string | null;
+    hasMore?: boolean;
+    limit?: number;
+    total?: number;
   };
 };
 
@@ -45,36 +66,43 @@ export default function PublicPhotoSelectionPage() {
 
   const [selectionProjectName, setSelectionProjectName] = useState("");
   const [selectionStudioName, setSelectionStudioName] = useState("");
-  const [selectionTabs, setSelectionTabs] = useState<Array<{ id: string; label: string }>>([]);
-  const [selectionPhotos, setSelectionPhotos] = useState<
-    Array<{
-      id: string;
-      url: string;
-      originalUrl: string | null;
-      tabId: string | null;
-      picked: boolean;
-      fav: boolean;
-      label: string;
-      fileName: string;
-      mimeType: string;
-    }>
+  const [selectionTabs, setSelectionTabs] = useState<
+    Array<{ id: string; label: string }>
   >([]);
+  const [selectionPhotos, setSelectionPhotos] = useState<SelectionPhoto[]>([]);
+  const [selectionNextCursor, setSelectionNextCursor] = useState<string | null>(
+    null,
+  );
+  const [selectionHasMore, setSelectionHasMore] = useState(false);
+  const [selectionLoadingMore, setSelectionLoadingMore] = useState(false);
 
   useEffect(() => {
     if (!slug || !String(slug).trim()) return;
-    const stored = typeof window !== "undefined" ? sessionStorage.getItem(storageKeyForSlug(slug)) : "";
+    const stored =
+      typeof window !== "undefined"
+        ? sessionStorage.getItem(storageKeyForSlug(slug))
+        : "";
     setAccessToken(stored || "");
     setPinGate(false);
     setPinInput("");
     setPinError(null);
   }, [slug]);
 
-  const applyPayload = useCallback((data: PublicPhotoSelectionPayload) => {
-      const photoSelectionRows = (data.photoSelection?.photos ?? [])
+  const applyPayload = useCallback(
+    (
+      data: PublicPhotoSelectionPayload,
+      mode: "replace" | "append" = "replace",
+    ) => {
+      const incomingPhotos: SelectionPhoto[] = (
+        data.photoSelection?.photos ?? []
+      )
         .map((img, idx) => ({
           id: String(img?.id ?? `ps-${idx}`),
           url: String(img?.url ?? ""),
-          originalUrl: typeof img?.originalUrl === "string" && img.originalUrl ? img.originalUrl : null,
+          originalUrl:
+            typeof img?.originalUrl === "string" && img.originalUrl
+              ? img.originalUrl
+              : null,
           tabId: typeof img?.tabId === "string" ? img.tabId : null,
           picked: Boolean(img?.picked),
           fav: Boolean(img?.fav),
@@ -92,20 +120,64 @@ export default function PublicPhotoSelectionPage() {
           id: String(tab?.id),
           label: String(tab?.label ?? `Tab ${idx + 1}`),
         }));
-      const inferredTabs =
-        declaredTabs.length > 0
-          ? declaredTabs
-          : Array.from(
-              new Set(
-                photoSelectionRows
-                  .map((photo) => photo.tabId)
-                  .filter((tabId): tabId is string => typeof tabId === "string" && tabId.length > 0)
-              )
-            ).map((tabId, idx) => ({ id: tabId, label: `Tab ${idx + 1}` }));
-      setSelectionTabs(inferredTabs);
-      setSelectionPhotos(photoSelectionRows);
+      if (declaredTabs.length > 0) {
+        setSelectionTabs(declaredTabs);
+      } else {
+        const inferredIncomingTabIds = Array.from(
+          new Set(
+            incomingPhotos
+              .map((photo) => photo.tabId)
+              .filter(
+                (tabId): tabId is string =>
+                  typeof tabId === "string" && tabId.length > 0,
+              ),
+          ),
+        );
+        setSelectionTabs((prev) => {
+          const ids = Array.from(
+            new Set([...prev.map((tab) => tab.id), ...inferredIncomingTabIds]),
+          );
+          return ids.map((id, idx) => {
+            const existing = prev.find((tab) => tab.id === id);
+            return existing ?? { id, label: `Tab ${idx + 1}` };
+          });
+        });
+      }
+
+      setSelectionPhotos((prev) => {
+        if (mode === "replace") return incomingPhotos;
+        const indexById = new Map(prev.map((photo, idx) => [photo.id, idx]));
+        const next = [...prev];
+        incomingPhotos.forEach((photo) => {
+          const existingIdx = indexById.get(photo.id);
+          if (typeof existingIdx === "number") {
+            next[existingIdx] = { ...next[existingIdx], ...photo };
+          } else {
+            indexById.set(photo.id, next.length);
+            next.push(photo);
+          }
+        });
+        return next;
+      });
+
+      setSelectionNextCursor(
+        typeof data.photoSelectionPage?.nextCursor === "string"
+          ? data.photoSelectionPage.nextCursor
+          : null,
+      );
+      setSelectionHasMore(Boolean(data.photoSelectionPage?.hasMore));
     },
-    []
+    [],
+  );
+
+  const selectionPath = useCallback(
+    (cursor?: string | null) => {
+      const qs = new URLSearchParams();
+      qs.set("limit", String(PUBLIC_PHOTO_SELECTION_PAGE_LIMIT));
+      if (cursor) qs.set("cursor", cursor);
+      return `/api/public/photos/${encodeURIComponent(slug || "")}?${qs.toString()}`;
+    },
+    [slug],
   );
 
   useEffect(() => {
@@ -123,15 +195,22 @@ export default function PublicPhotoSelectionPage() {
       setLoading(true);
       setError(null);
       setSelectionStudioName("");
+      setSelectionPhotos([]);
+      setSelectionTabs([]);
+      setSelectionHasMore(false);
+      setSelectionNextCursor(null);
+      setSelectionLoadingMore(false);
 
       try {
         const data = await apiFetch<PublicPhotoSelectionPayload>(
-          `/api/public/photos/${encodeURIComponent(slug)}`,
-          { token: accessToken || null }
+          selectionPath(),
+          {
+            token: accessToken || null,
+          },
         );
 
         if (cancelled) return;
-        applyPayload(data);
+        applyPayload(data, "replace");
         setPinGate(false);
         setPinError(null);
       } catch (err) {
@@ -140,10 +219,13 @@ export default function PublicPhotoSelectionPage() {
         if (e.pinRequired) {
           setPinGate(true);
           setPinError(null);
-          if (typeof window !== "undefined") sessionStorage.removeItem(storageKeyForSlug(slug));
+          if (typeof window !== "undefined")
+            sessionStorage.removeItem(storageKeyForSlug(slug));
           setAccessToken("");
         } else {
-          setError(e instanceof Error ? e.message : "Failed to load photo selection");
+          setError(
+            e instanceof Error ? e.message : "Failed to load photo selection",
+          );
           setPinGate(false);
         }
       } finally {
@@ -155,7 +237,7 @@ export default function PublicPhotoSelectionPage() {
     return () => {
       cancelled = true;
     };
-  }, [slug, accessToken, applyPayload]);
+  }, [slug, accessToken, applyPayload, selectionPath]);
 
   const submitPin = async () => {
     if (!slug?.trim()) return;
@@ -169,7 +251,7 @@ export default function PublicPhotoSelectionPage() {
     try {
       const res = await apiFetch<{ accessToken?: string }>(
         `/api/public/photos/${encodeURIComponent(slug)}/verify-pin`,
-        { method: "POST", body: { pin } }
+        { method: "POST", body: { pin } },
       );
       const tok = typeof res?.accessToken === "string" ? res.accessToken : "";
       if (!tok) {
@@ -187,16 +269,48 @@ export default function PublicPhotoSelectionPage() {
     }
   };
 
+  const loadMorePhotos = useCallback(async () => {
+    if (!selectionHasMore || !selectionNextCursor || selectionLoadingMore)
+      return;
+    setSelectionLoadingMore(true);
+    try {
+      const data = await apiFetch<PublicPhotoSelectionPayload>(
+        selectionPath(selectionNextCursor),
+        {
+          token: accessToken || null,
+        },
+      );
+      applyPayload(data, "append");
+    } catch (e) {
+      window.alert(
+        e instanceof Error ? e.message : "Failed to load more photos",
+      );
+    } finally {
+      setSelectionLoadingMore(false);
+    }
+  }, [
+    selectionHasMore,
+    selectionNextCursor,
+    selectionLoadingMore,
+    selectionPath,
+    accessToken,
+    applyPayload,
+  ]);
+
   if (pinGate && slug) {
     return (
       <main className="min-h-screen bg-[#f7f4ef] antialiased text-stone-900">
         <section className="mx-auto flex max-w-md flex-col gap-4 px-4 py-16 sm:px-6">
           <h1 className="font-display text-2xl text-stone-900">PIN required</h1>
           <p className="text-sm text-stone-600">
-            This gallery is protected. Enter the PIN your photographer shared with you.
+            This gallery is protected. Enter the PIN your photographer shared
+            with you.
           </p>
           <div>
-            <label htmlFor="photo-sel-pin" className="text-sm font-semibold text-stone-800">
+            <label
+              htmlFor="photo-sel-pin"
+              className="text-sm font-semibold text-stone-800"
+            >
               PIN
             </label>
             <input
@@ -206,7 +320,9 @@ export default function PublicPhotoSelectionPage() {
               autoComplete="one-time-code"
               maxLength={8}
               value={pinInput}
-              onChange={(e) => setPinInput(e.target.value.replace(/\D/g, "").slice(0, 8))}
+              onChange={(e) =>
+                setPinInput(e.target.value.replace(/\D/g, "").slice(0, 8))
+              }
               className="mt-2 h-12 w-full rounded-xl border border-stone-200 bg-white px-3 text-lg tracking-widest text-stone-900 outline-none ring-stone-900/10 focus:ring-4"
               placeholder="••••"
             />
@@ -236,6 +352,9 @@ export default function PublicPhotoSelectionPage() {
       projectName={selectionProjectName}
       tabs={selectionTabs}
       photos={selectionPhotos}
+      hasMorePhotos={selectionHasMore}
+      loadingMorePhotos={selectionLoadingMore}
+      onLoadMorePhotos={loadMorePhotos}
     />
   );
 }

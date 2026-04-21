@@ -1,5 +1,17 @@
 const publicProjectsService = require("../services/publicProjects.service");
 
+function photoSelectionPaginationFromQuery(query) {
+  const limitRaw = query?.limit;
+  const cursorRaw = query?.cursor;
+  return {
+    limit:
+      typeof limitRaw === "string" || typeof limitRaw === "number"
+        ? Number.parseInt(String(limitRaw), 10)
+        : undefined,
+    cursor: typeof cursorRaw === "string" ? cursorRaw : undefined,
+  };
+}
+
 function sendResult(res, result) {
   if (result.error) {
     const body = { message: result.error.message };
@@ -11,8 +23,14 @@ function sendResult(res, result) {
 
 async function getProjectByShareToken(req, res) {
   try {
-    const accessToken = publicProjectsService.bearerFromAuthorizationHeader(req.headers.authorization);
-    const result = await publicProjectsService.getPublicProjectByShareToken(req.params.shareToken, accessToken);
+    const accessToken = publicProjectsService.bearerFromAuthorizationHeader(
+      req.headers.authorization,
+    );
+    const result = await publicProjectsService.getPublicProjectByShareToken(
+      req.params.shareToken,
+      accessToken,
+      photoSelectionPaginationFromQuery(req.query),
+    );
     return sendResult(res, result);
   } catch (err) {
     // eslint-disable-next-line no-console
@@ -23,8 +41,14 @@ async function getProjectByShareToken(req, res) {
 
 async function getProjectBySlug(req, res) {
   try {
-    const accessToken = publicProjectsService.bearerFromAuthorizationHeader(req.headers.authorization);
-    const result = await publicProjectsService.getPublicProjectBySlug(req.params.slug, accessToken);
+    const accessToken = publicProjectsService.bearerFromAuthorizationHeader(
+      req.headers.authorization,
+    );
+    const result = await publicProjectsService.getPublicProjectBySlug(
+      req.params.slug,
+      accessToken,
+      photoSelectionPaginationFromQuery(req.query),
+    );
     return sendResult(res, result);
   } catch (err) {
     // eslint-disable-next-line no-console
@@ -35,12 +59,14 @@ async function getProjectBySlug(req, res) {
 
 async function updatePhotoSelectionPhoto(req, res) {
   try {
-    const accessToken = publicProjectsService.bearerFromAuthorizationHeader(req.headers.authorization);
+    const accessToken = publicProjectsService.bearerFromAuthorizationHeader(
+      req.headers.authorization,
+    );
     const result = await publicProjectsService.updatePublicPhotoSelectionPhoto(
       req.params.shareToken,
       req.params.photoId,
       req.body,
-      accessToken
+      accessToken,
     );
     return sendResult(res, result);
   } catch (err) {
@@ -52,14 +78,18 @@ async function updatePhotoSelectionPhoto(req, res) {
 
 async function downloadPhotoSelectionPhoto(req, res) {
   try {
-    const accessToken = publicProjectsService.bearerFromAuthorizationHeader(req.headers.authorization);
-    const variant = req.query?.variant === "original" ? "original" : "optimized";
-    const resolved = await publicProjectsService.resolvePublicPhotoSelectionDownload(
-      req.params.shareToken,
-      req.params.photoId,
-      variant,
-      accessToken
+    const accessToken = publicProjectsService.bearerFromAuthorizationHeader(
+      req.headers.authorization,
     );
+    const variant =
+      req.query?.variant === "original" ? "original" : "optimized";
+    const resolved =
+      await publicProjectsService.resolvePublicPhotoSelectionDownload(
+        req.params.shareToken,
+        req.params.photoId,
+        variant,
+        accessToken,
+      );
     if (resolved.error) {
       const body = { message: resolved.error.message };
       if (resolved.error.pinRequired) body.pinRequired = true;
@@ -67,7 +97,8 @@ async function downloadPhotoSelectionPhoto(req, res) {
     }
 
     const upstream = await fetch(resolved.sourceUrl);
-    if (!upstream.ok) return res.status(502).json({ message: "Failed to fetch source image" });
+    if (!upstream.ok)
+      return res.status(502).json({ message: "Failed to fetch source image" });
     const arrayBuffer = await upstream.arrayBuffer();
     const contentType =
       upstream.headers.get("content-type") ||
@@ -75,7 +106,10 @@ async function downloadPhotoSelectionPhoto(req, res) {
       "application/octet-stream";
 
     res.setHeader("Content-Type", contentType);
-    res.setHeader("Content-Disposition", `attachment; filename="${resolved.fileName}"`);
+    res.setHeader(
+      "Content-Disposition",
+      `attachment; filename="${resolved.fileName}"`,
+    );
     return res.status(200).send(Buffer.from(arrayBuffer));
   } catch (err) {
     // eslint-disable-next-line no-console
@@ -86,16 +120,22 @@ async function downloadPhotoSelectionPhoto(req, res) {
 
 async function downloadAlbumImage(req, res) {
   try {
-    const variant = req.query?.variant === "original" ? "original" : "optimized";
-    const resolved = await publicProjectsService.resolvePublicAlbumImageDownload(
-      req.params.shareToken,
-      req.params.imageId,
-      variant
-    );
-    if (resolved.error) return res.status(resolved.error.status).json({ message: resolved.error.message });
+    const variant =
+      req.query?.variant === "original" ? "original" : "optimized";
+    const resolved =
+      await publicProjectsService.resolvePublicAlbumImageDownload(
+        req.params.shareToken,
+        req.params.imageId,
+        variant,
+      );
+    if (resolved.error)
+      return res
+        .status(resolved.error.status)
+        .json({ message: resolved.error.message });
 
     const upstream = await fetch(resolved.sourceUrl);
-    if (!upstream.ok) return res.status(502).json({ message: "Failed to fetch source image" });
+    if (!upstream.ok)
+      return res.status(502).json({ message: "Failed to fetch source image" });
     const arrayBuffer = await upstream.arrayBuffer();
     const contentType =
       upstream.headers.get("content-type") ||
@@ -103,7 +143,10 @@ async function downloadAlbumImage(req, res) {
       "application/octet-stream";
 
     res.setHeader("Content-Type", contentType);
-    res.setHeader("Content-Disposition", `attachment; filename="${resolved.fileName}"`);
+    res.setHeader(
+      "Content-Disposition",
+      `attachment; filename="${resolved.fileName}"`,
+    );
     return res.status(200).send(Buffer.from(arrayBuffer));
   } catch (err) {
     // eslint-disable-next-line no-console
@@ -114,8 +157,14 @@ async function downloadAlbumImage(req, res) {
 
 async function getPublicPhotoSelectionBySlug(req, res) {
   try {
-    const accessToken = publicProjectsService.bearerFromAuthorizationHeader(req.headers.authorization);
-    const result = await publicProjectsService.getPublicPhotoSelectionBySlug(req.params.slug, accessToken);
+    const accessToken = publicProjectsService.bearerFromAuthorizationHeader(
+      req.headers.authorization,
+    );
+    const result = await publicProjectsService.getPublicPhotoSelectionBySlug(
+      req.params.slug,
+      accessToken,
+      photoSelectionPaginationFromQuery(req.query),
+    );
     return sendResult(res, result);
   } catch (err) {
     // eslint-disable-next-line no-console
@@ -126,13 +175,16 @@ async function getPublicPhotoSelectionBySlug(req, res) {
 
 async function updatePhotoSelectionPhotoBySlug(req, res) {
   try {
-    const accessToken = publicProjectsService.bearerFromAuthorizationHeader(req.headers.authorization);
-    const result = await publicProjectsService.updatePublicPhotoSelectionPhotoBySlug(
-      req.params.slug,
-      req.params.photoId,
-      req.body,
-      accessToken
+    const accessToken = publicProjectsService.bearerFromAuthorizationHeader(
+      req.headers.authorization,
     );
+    const result =
+      await publicProjectsService.updatePublicPhotoSelectionPhotoBySlug(
+        req.params.slug,
+        req.params.photoId,
+        req.body,
+        accessToken,
+      );
     return sendResult(res, result);
   } catch (err) {
     // eslint-disable-next-line no-console
@@ -143,14 +195,18 @@ async function updatePhotoSelectionPhotoBySlug(req, res) {
 
 async function downloadPhotoSelectionPhotoBySlug(req, res) {
   try {
-    const accessToken = publicProjectsService.bearerFromAuthorizationHeader(req.headers.authorization);
-    const variant = req.query?.variant === "original" ? "original" : "optimized";
-    const resolved = await publicProjectsService.resolvePublicPhotoSelectionDownloadBySlug(
-      req.params.slug,
-      req.params.photoId,
-      variant,
-      accessToken
+    const accessToken = publicProjectsService.bearerFromAuthorizationHeader(
+      req.headers.authorization,
     );
+    const variant =
+      req.query?.variant === "original" ? "original" : "optimized";
+    const resolved =
+      await publicProjectsService.resolvePublicPhotoSelectionDownloadBySlug(
+        req.params.slug,
+        req.params.photoId,
+        variant,
+        accessToken,
+      );
     if (resolved.error) {
       const body = { message: resolved.error.message };
       if (resolved.error.pinRequired) body.pinRequired = true;
@@ -158,7 +214,8 @@ async function downloadPhotoSelectionPhotoBySlug(req, res) {
     }
 
     const upstream = await fetch(resolved.sourceUrl);
-    if (!upstream.ok) return res.status(502).json({ message: "Failed to fetch source image" });
+    if (!upstream.ok)
+      return res.status(502).json({ message: "Failed to fetch source image" });
     const arrayBuffer = await upstream.arrayBuffer();
     const contentType =
       upstream.headers.get("content-type") ||
@@ -166,7 +223,10 @@ async function downloadPhotoSelectionPhotoBySlug(req, res) {
       "application/octet-stream";
 
     res.setHeader("Content-Type", contentType);
-    res.setHeader("Content-Disposition", `attachment; filename="${resolved.fileName}"`);
+    res.setHeader(
+      "Content-Disposition",
+      `attachment; filename="${resolved.fileName}"`,
+    );
     return res.status(200).send(Buffer.from(arrayBuffer));
   } catch (err) {
     // eslint-disable-next-line no-console
@@ -177,16 +237,22 @@ async function downloadPhotoSelectionPhotoBySlug(req, res) {
 
 async function downloadAlbumImageBySlug(req, res) {
   try {
-    const variant = req.query?.variant === "original" ? "original" : "optimized";
-    const resolved = await publicProjectsService.resolvePublicAlbumImageDownloadBySlug(
-      req.params.slug,
-      req.params.imageId,
-      variant
-    );
-    if (resolved.error) return res.status(resolved.error.status).json({ message: resolved.error.message });
+    const variant =
+      req.query?.variant === "original" ? "original" : "optimized";
+    const resolved =
+      await publicProjectsService.resolvePublicAlbumImageDownloadBySlug(
+        req.params.slug,
+        req.params.imageId,
+        variant,
+      );
+    if (resolved.error)
+      return res
+        .status(resolved.error.status)
+        .json({ message: resolved.error.message });
 
     const upstream = await fetch(resolved.sourceUrl);
-    if (!upstream.ok) return res.status(502).json({ message: "Failed to fetch source image" });
+    if (!upstream.ok)
+      return res.status(502).json({ message: "Failed to fetch source image" });
     const arrayBuffer = await upstream.arrayBuffer();
     const contentType =
       upstream.headers.get("content-type") ||
@@ -194,7 +260,10 @@ async function downloadAlbumImageBySlug(req, res) {
       "application/octet-stream";
 
     res.setHeader("Content-Type", contentType);
-    res.setHeader("Content-Disposition", `attachment; filename="${resolved.fileName}"`);
+    res.setHeader(
+      "Content-Disposition",
+      `attachment; filename="${resolved.fileName}"`,
+    );
     return res.status(200).send(Buffer.from(arrayBuffer));
   } catch (err) {
     // eslint-disable-next-line no-console
@@ -205,7 +274,10 @@ async function downloadAlbumImageBySlug(req, res) {
 
 async function verifyPhotoSelectionPinBySlug(req, res) {
   try {
-    const result = await publicProjectsService.verifyPhotoSelectionPinBySlug(req.params.slug, req.body?.pin);
+    const result = await publicProjectsService.verifyPhotoSelectionPinBySlug(
+      req.params.slug,
+      req.body?.pin,
+    );
     return sendResult(res, result);
   } catch (err) {
     // eslint-disable-next-line no-console
@@ -216,10 +288,11 @@ async function verifyPhotoSelectionPinBySlug(req, res) {
 
 async function verifyPhotoSelectionPinByShareToken(req, res) {
   try {
-    const result = await publicProjectsService.verifyPhotoSelectionPinByShareToken(
-      req.params.shareToken,
-      req.body?.pin
-    );
+    const result =
+      await publicProjectsService.verifyPhotoSelectionPinByShareToken(
+        req.params.shareToken,
+        req.body?.pin,
+      );
     return sendResult(res, result);
   } catch (err) {
     // eslint-disable-next-line no-console

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { Heart, Check, Download, ChevronDown, X } from "lucide-react";
@@ -27,7 +27,10 @@ export type PublicPhotoLookup =
   | { kind: "slug"; slug: string }
   | { kind: "shareToken"; shareToken: string };
 
-function photoSelectionPhotoApiPath(lookup: PublicPhotoLookup, photoId: string) {
+function photoSelectionPhotoApiPath(
+  lookup: PublicPhotoLookup,
+  photoId: string,
+) {
   const enc = encodeURIComponent;
   const tail = `/photo-selection/photos/${enc(photoId)}`;
   if (lookup.kind === "slug") {
@@ -48,6 +51,9 @@ type Props = {
   projectName: string;
   tabs: PublicSelectionTab[];
   photos: PublicSelectionPhoto[];
+  hasMorePhotos?: boolean;
+  loadingMorePhotos?: boolean;
+  onLoadMorePhotos?: () => void | Promise<void>;
 };
 
 const ALL_TAB_ID = "__all__";
@@ -80,37 +86,97 @@ export default function PublicPhotoSelectionScreen({
   projectName,
   tabs,
   photos,
+  hasMorePhotos = false,
+  loadingMorePhotos = false,
+  onLoadMorePhotos,
 }: Props) {
   const [activeTabId, setActiveTabId] = useState<string>(ALL_TAB_ID);
   const [lightboxPhotoId, setLightboxPhotoId] = useState<string | null>(null);
   const [selectedById, setSelectedById] = useState<Record<string, boolean>>({});
   const [favById, setFavById] = useState<Record<string, boolean>>({});
   const [downloadMenuOpen, setDownloadMenuOpen] = useState(false);
-  const [downloadBusy, setDownloadBusy] = useState<"original" | "optimized" | null>(null);
-  const [lightboxOriginalSizeLabel, setLightboxOriginalSizeLabel] = useState<string>("");
-  const [lightboxOptimizedSizeLabel, setLightboxOptimizedSizeLabel] = useState<string>("");
-  const [gridFallbackToOriginalById, setGridFallbackToOriginalById] = useState<Record<string, boolean>>({});
-  const [lightboxFallbackToOriginal, setLightboxFallbackToOriginal] = useState(false);
+  const [downloadBusy, setDownloadBusy] = useState<
+    "original" | "optimized" | null
+  >(null);
+  const [lightboxOriginalSizeLabel, setLightboxOriginalSizeLabel] =
+    useState<string>("");
+  const [lightboxOptimizedSizeLabel, setLightboxOptimizedSizeLabel] =
+    useState<string>("");
+  const [gridFallbackToOriginalById, setGridFallbackToOriginalById] = useState<
+    Record<string, boolean>
+  >({});
+  const [lightboxFallbackToOriginal, setLightboxFallbackToOriginal] =
+    useState(false);
+  const loadMoreSentinelRef = useRef<HTMLDivElement | null>(null);
+  const loadMoreBusyRef = useRef(false);
+  const loadingMoreRef = useRef(loadingMorePhotos);
 
   useEffect(() => {
-    setSelectedById(
-      Object.fromEntries(photos.map((photo) => [photo.id, Boolean(photo.picked)]))
+    setSelectedById((prev) =>
+      Object.fromEntries(
+        photos.map((photo) => [
+          photo.id,
+          typeof prev[photo.id] === "boolean"
+            ? prev[photo.id]
+            : Boolean(photo.picked),
+        ]),
+      ),
     );
-    setFavById(Object.fromEntries(photos.map((photo) => [photo.id, Boolean(photo.fav)])));
+    setFavById((prev) =>
+      Object.fromEntries(
+        photos.map((photo) => [
+          photo.id,
+          typeof prev[photo.id] === "boolean"
+            ? prev[photo.id]
+            : Boolean(photo.fav),
+        ]),
+      ),
+    );
     setGridFallbackToOriginalById({});
   }, [photos]);
 
-  const visiblePhotos = useMemo(() => {
+  const photosForActiveTab = useMemo(() => {
     if (activeTabId === ALL_TAB_ID) return photos;
     return photos.filter((photo) => photo.tabId === activeTabId);
   }, [activeTabId, photos]);
 
+  useEffect(() => {
+    loadingMoreRef.current = loadingMorePhotos;
+    if (!loadingMorePhotos) loadMoreBusyRef.current = false;
+  }, [loadingMorePhotos]);
+
+  useEffect(() => {
+    const el = loadMoreSentinelRef.current;
+    if (!el || !hasMorePhotos || !onLoadMorePhotos) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        const hit = entries.some((e) => e.isIntersecting);
+        if (!hit || loadMoreBusyRef.current || loadingMorePhotos) return;
+        loadMoreBusyRef.current = true;
+        void Promise.resolve(onLoadMorePhotos()).finally(() => {
+          if (!loadingMoreRef.current) loadMoreBusyRef.current = false;
+        });
+      },
+      { root: null, rootMargin: "400px 0px", threshold: 0 },
+    );
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [
+    hasMorePhotos,
+    loadingMorePhotos,
+    onLoadMorePhotos,
+    photosForActiveTab.length,
+  ]);
+
   const selectedCount = useMemo(
     () => photos.filter((p) => selectedById[p.id]).length,
-    [photos, selectedById]
+    [photos, selectedById],
   );
 
-  const lightboxPhoto = lightboxPhotoId ? photos.find((p) => p.id === lightboxPhotoId) ?? null : null;
+  const lightboxPhoto = lightboxPhotoId
+    ? (photos.find((p) => p.id === lightboxPhotoId) ?? null)
+    : null;
   useEffect(() => {
     if (!lightboxPhoto) setDownloadMenuOpen(false);
     setLightboxFallbackToOriginal(false);
@@ -127,7 +193,9 @@ export default function PublicPhotoSelectionScreen({
     const headers: Record<string, string> = {};
     if (accessToken) headers.Authorization = `Bearer ${accessToken}`;
 
-    async function fetchVariantSize(variant: "original" | "optimized"): Promise<string> {
+    async function fetchVariantSize(
+      variant: "original" | "optimized",
+    ): Promise<string> {
       try {
         const path = `${photoSelectionPhotoApiPath(publicLookup, photoId)}/download?variant=${variant}`;
         const url = `${API_BASE_URL}${path.startsWith("/") ? "" : "/"}${path}`;
@@ -237,7 +305,9 @@ export default function PublicPhotoSelectionScreen({
           {loading ? (
             <div className="space-y-3">
               <div className={`h-2.5 w-40 rounded-md ${shimmerBar}`} />
-              <div className={`h-9 max-w-md rounded-lg sm:h-10 ${shimmerBar}`} />
+              <div
+                className={`h-9 max-w-md rounded-lg sm:h-10 ${shimmerBar}`}
+              />
               <div className={`h-3 w-48 rounded-md ${shimmerBar}`} />
             </div>
           ) : (
@@ -247,11 +317,19 @@ export default function PublicPhotoSelectionScreen({
                   {studioName.trim()}
                 </p>
               ) : null}
-              <h1 className={studioName.trim() ? "mt-0 text-3xl font-display sm:text-4xl" : "text-3xl font-display sm:text-4xl"}>
+              <h1
+                className={
+                  studioName.trim()
+                    ? "mt-0 text-3xl font-display sm:text-4xl"
+                    : "text-3xl font-display sm:text-4xl"
+                }
+              >
                 {projectName || "Gallery"}
               </h1>
               {subheading.trim() ? (
-                <p className="mt-1 max-w-2xl text-sm text-stone-600 sm:text-base">{subheading}</p>
+                <p className="mt-1 max-w-2xl text-sm text-stone-600 sm:text-base">
+                  {subheading}
+                </p>
               ) : null}
               <p className="mt-1.5 text-xs font-semibold uppercase tracking-wide text-stone-500">
                 {selectedCount} selected · {photos.length} photos
@@ -275,7 +353,10 @@ export default function PublicPhotoSelectionScreen({
               </div>
               <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
                 {Array.from({ length: 12 }).map((_, i) => (
-                  <div key={i} className={`aspect-[4/5] rounded-2xl ${shimmerBar}`} />
+                  <div
+                    key={i}
+                    className={`aspect-[4/5] rounded-2xl ${shimmerBar}`}
+                  />
                 ))}
               </div>
             </div>
@@ -315,87 +396,115 @@ export default function PublicPhotoSelectionScreen({
                 ))}
               </div>
 
-              {visiblePhotos.length === 0 ? (
+              {photosForActiveTab.length === 0 ? (
                 <div className="rounded-2xl border border-dashed border-stone-300 bg-white/80 p-8 text-center text-sm text-stone-600">
                   No photos in this section yet.
                 </div>
               ) : (
-                <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
-                  {visiblePhotos.map((photo) => (
-                    <div
-                      key={photo.id}
-                      className="group relative aspect-[4/5] overflow-hidden rounded-2xl border border-stone-200 bg-stone-100"
-                    >
-                      <button
-                        type="button"
-                        onClick={() => setLightboxPhotoId(photo.id)}
-                        className="absolute inset-0"
-                        aria-label={`Open ${photo.label}`}
+                <>
+                  <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
+                    {photosForActiveTab.map((photo) => (
+                      <div
+                        key={photo.id}
+                        className="group relative aspect-[4/5] overflow-hidden rounded-2xl border border-stone-200 bg-stone-100"
                       >
-                        <Image
-                          src={
-                            gridFallbackToOriginalById[photo.id]
-                              ? photo.originalUrl || photo.url || ""
-                              : photo.url || photo.originalUrl || ""
-                          }
-                          alt={photo.label}
-                          fill
-                          sizes="(max-width: 768px) 50vw, 220px"
-                          onError={() => {
-                            if (!photo.originalUrl) return;
-                            setGridFallbackToOriginalById((prev) =>
-                              prev[photo.id] ? prev : { ...prev, [photo.id]: true }
-                            );
+                        <button
+                          type="button"
+                          onClick={() => setLightboxPhotoId(photo.id)}
+                          className="absolute inset-0"
+                          aria-label={`Open ${photo.label}`}
+                        >
+                          <Image
+                            src={
+                              gridFallbackToOriginalById[photo.id]
+                                ? photo.originalUrl || photo.url || ""
+                                : photo.url || photo.originalUrl || ""
+                            }
+                            alt={photo.label}
+                            fill
+                            sizes="(max-width: 768px) 50vw, 220px"
+                            onError={() => {
+                              if (!photo.originalUrl) return;
+                              setGridFallbackToOriginalById((prev) =>
+                                prev[photo.id]
+                                  ? prev
+                                  : { ...prev, [photo.id]: true },
+                              );
+                            }}
+                            className="object-cover"
+                          />
+                          <span className="absolute inset-0 bg-gradient-to-t from-black/35 via-transparent to-transparent" />
+                        </button>
+                        <span className="pointer-events-none absolute bottom-2 left-2 max-w-[70%] truncate rounded-full bg-black/45 px-2 py-0.5 text-[10px] font-semibold text-white">
+                          {photo.label}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            toggleFav(photo.id);
                           }}
-                          className="object-cover"
-                        />
-                        <span className="absolute inset-0 bg-gradient-to-t from-black/35 via-transparent to-transparent" />
-                      </button>
-                      <span className="pointer-events-none absolute bottom-2 left-2 max-w-[70%] truncate rounded-full bg-black/45 px-2 py-0.5 text-[10px] font-semibold text-white">
-                        {photo.label}
+                          className={[
+                            "absolute left-2 top-2 z-10 inline-flex h-8 w-8 items-center justify-center rounded-full bg-white/95 shadow ring-1 ring-stone-200/90 transition hover:bg-white",
+                            favById[photo.id]
+                              ? "text-rose-600"
+                              : "text-stone-400 hover:text-rose-500",
+                          ].join(" ")}
+                          aria-label={
+                            favById[photo.id]
+                              ? "Remove from favourites"
+                              : "Add to favourites"
+                          }
+                        >
+                          <Heart
+                            className={[
+                              "h-4 w-4",
+                              favById[photo.id] ? "fill-current" : "",
+                            ].join(" ")}
+                            strokeWidth={1.75}
+                          />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            toggleSelected(photo.id);
+                          }}
+                          className={[
+                            "absolute right-2 top-2 z-10 inline-flex h-8 items-center rounded-full px-2.5 text-[11px] font-semibold shadow",
+                            selectedById[photo.id]
+                              ? "bg-white text-stone-900"
+                              : "bg-stone-900 text-white",
+                          ].join(" ")}
+                        >
+                          {selectedById[photo.id] ? (
+                            <>
+                              <Check
+                                className="mr-1 h-3.5 w-3.5"
+                                strokeWidth={2.5}
+                              />
+                              Selected
+                            </>
+                          ) : (
+                            "Select"
+                          )}
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                  {hasMorePhotos || loadingMorePhotos ? (
+                    <div
+                      ref={loadMoreSentinelRef}
+                      className="flex min-h-10 items-center justify-center py-3"
+                    >
+                      <span className="text-xs text-stone-400">
+                        {loadingMorePhotos
+                          ? "Loading more photos..."
+                          : `Showing ${photosForActiveTab.length} loaded photos`}
                       </span>
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          toggleFav(photo.id);
-                        }}
-                        className={[
-                          "absolute left-2 top-2 z-10 inline-flex h-8 w-8 items-center justify-center rounded-full bg-white/95 shadow ring-1 ring-stone-200/90 transition hover:bg-white",
-                          favById[photo.id] ? "text-rose-600" : "text-stone-400 hover:text-rose-500",
-                        ].join(" ")}
-                        aria-label={favById[photo.id] ? "Remove from favourites" : "Add to favourites"}
-                      >
-                        <Heart
-                          className={["h-4 w-4", favById[photo.id] ? "fill-current" : ""].join(" ")}
-                          strokeWidth={1.75}
-                        />
-                      </button>
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          toggleSelected(photo.id);
-                        }}
-                        className={[
-                          "absolute right-2 top-2 z-10 inline-flex h-8 items-center rounded-full px-2.5 text-[11px] font-semibold shadow",
-                          selectedById[photo.id]
-                            ? "bg-white text-stone-900"
-                            : "bg-stone-900 text-white",
-                        ].join(" ")}
-                      >
-                        {selectedById[photo.id] ? (
-                          <>
-                            <Check className="mr-1 h-3.5 w-3.5" strokeWidth={2.5} />
-                            Selected
-                          </>
-                        ) : (
-                          "Select"
-                        )}
-                      </button>
                     </div>
-                  ))}
-                </div>
+                  ) : null}
+                </>
               )}
             </>
           )}
@@ -419,10 +528,14 @@ export default function PublicPhotoSelectionScreen({
                 }}
                 className={[
                   "inline-flex h-10 items-center rounded-xl border border-white/20 bg-white/10 px-3 text-sm font-semibold text-white hover:bg-white/20",
-                  lightboxPhoto && selectedById[lightboxPhoto.id] ? "text-white" : "text-white/90",
+                  lightboxPhoto && selectedById[lightboxPhoto.id]
+                    ? "text-white"
+                    : "text-white/90",
                 ].join(" ")}
                 aria-label={
-                  lightboxPhoto && selectedById[lightboxPhoto.id] ? "Remove selection" : "Select photo"
+                  lightboxPhoto && selectedById[lightboxPhoto.id]
+                    ? "Remove selection"
+                    : "Select photo"
                 }
               >
                 {lightboxPhoto && selectedById[lightboxPhoto.id] ? (
@@ -441,14 +554,23 @@ export default function PublicPhotoSelectionScreen({
                 }}
                 className={[
                   "inline-flex h-10 w-10 items-center justify-center rounded-xl border border-white/20 bg-white/10 text-white hover:bg-white/20",
-                  lightboxPhoto && favById[lightboxPhoto.id] ? "text-rose-400" : "text-white/90",
+                  lightboxPhoto && favById[lightboxPhoto.id]
+                    ? "text-rose-400"
+                    : "text-white/90",
                 ].join(" ")}
                 aria-label={
-                  lightboxPhoto && favById[lightboxPhoto.id] ? "Remove from favourites" : "Add to favourites"
+                  lightboxPhoto && favById[lightboxPhoto.id]
+                    ? "Remove from favourites"
+                    : "Add to favourites"
                 }
               >
                 <Heart
-                  className={["h-5 w-5", lightboxPhoto && favById[lightboxPhoto.id] ? "fill-current" : ""].join(" ")}
+                  className={[
+                    "h-5 w-5",
+                    lightboxPhoto && favById[lightboxPhoto.id]
+                      ? "fill-current"
+                      : "",
+                  ].join(" ")}
                   strokeWidth={1.75}
                 />
               </button>
@@ -461,7 +583,13 @@ export default function PublicPhotoSelectionScreen({
                 >
                   <Download className="h-4 w-4" strokeWidth={2} />
                   {downloadBusy ? "Preparing..." : "Download"}
-                  <ChevronDown className={["h-4 w-4 transition", downloadMenuOpen ? "rotate-180" : ""].join(" ")} strokeWidth={2} />
+                  <ChevronDown
+                    className={[
+                      "h-4 w-4 transition",
+                      downloadMenuOpen ? "rotate-180" : "",
+                    ].join(" ")}
+                    strokeWidth={2}
+                  />
                 </button>
                 {downloadMenuOpen ? (
                   <div className="absolute right-0 top-full z-20 mt-2 w-56 rounded-xl border border-white/20 bg-black/90 p-1.5 shadow-xl backdrop-blur">

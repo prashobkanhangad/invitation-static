@@ -2,6 +2,9 @@ const Album = require("../models/Album");
 const Project = require("../models/Project");
 const photoSelectionPin = require("./photoSelectionPin");
 
+const DEFAULT_PUBLIC_PHOTO_SELECTION_LIMIT = 30;
+const MAX_PUBLIC_PHOTO_SELECTION_LIMIT = 120;
+
 function normalizeTemplate(template) {
   if (!template) return null;
   return {
@@ -19,32 +22,86 @@ function normalizeTemplate(template) {
 
 function normalizeSlug(input) {
   if (!input || typeof input !== "string") return "";
-  return input.trim().toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 60);
+  return input
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 60);
 }
 
 function safePublicPhotoSelection(project) {
   const ps = project.photoSelection;
   if (!ps) return null;
-  const raw = typeof ps.toObject === "function" ? ps.toObject({ flattenMaps: true }) : { ...ps };
+  const raw =
+    typeof ps.toObject === "function"
+      ? ps.toObject({ flattenMaps: true })
+      : { ...ps };
   if (raw && typeof raw === "object" && "pinHash" in raw) delete raw.pinHash;
   return raw;
+}
+
+function normalizePublicPhotoSelectionLimit(rawLimit) {
+  const n = Number.parseInt(String(rawLimit ?? ""), 10);
+  if (!Number.isFinite(n) || n <= 0)
+    return DEFAULT_PUBLIC_PHOTO_SELECTION_LIMIT;
+  return Math.min(MAX_PUBLIC_PHOTO_SELECTION_LIMIT, Math.max(1, n));
+}
+
+function normalizePublicPhotoSelectionOffset(rawCursor) {
+  const n = Number.parseInt(String(rawCursor ?? ""), 10);
+  if (!Number.isFinite(n) || n < 0) return 0;
+  return n;
+}
+
+function buildPublicPhotoSelectionPage(project, paginationInput) {
+  const rawSelection = safePublicPhotoSelection(project);
+  if (!rawSelection) {
+    return { photoSelection: null, photoSelectionPage: null };
+  }
+
+  const allPhotos = Array.isArray(rawSelection.photos)
+    ? rawSelection.photos
+    : [];
+  const limit = normalizePublicPhotoSelectionLimit(paginationInput?.limit);
+  const requestedOffset = normalizePublicPhotoSelectionOffset(
+    paginationInput?.cursor,
+  );
+  const offset = Math.min(Math.max(0, requestedOffset), allPhotos.length);
+  const photos = allPhotos.slice(offset, offset + limit);
+  const consumed = offset + photos.length;
+  const hasMore = consumed < allPhotos.length;
+
+  return {
+    photoSelection: { ...rawSelection, photos },
+    photoSelectionPage: {
+      cursor: String(offset),
+      nextCursor: hasMore ? String(consumed) : null,
+      hasMore,
+      limit,
+      total: allPhotos.length,
+    },
+  };
 }
 
 function publicStudioDisplayName(project) {
   const u = project?.studioUser;
   if (!u || typeof u !== "object") return "";
-  const studioName = typeof u.studioName === "string" ? u.studioName.trim() : "";
+  const studioName =
+    typeof u.studioName === "string" ? u.studioName.trim() : "";
   const accountName = typeof u.name === "string" ? u.name.trim() : "";
   return studioName || accountName || "";
 }
 
 function mapAlbumResponse(album) {
   const desktopPos =
-    typeof album.bannerHeroDesktopPosition === "string" && album.bannerHeroDesktopPosition.trim()
+    typeof album.bannerHeroDesktopPosition === "string" &&
+    album.bannerHeroDesktopPosition.trim()
       ? album.bannerHeroDesktopPosition.trim()
       : "50% 50%";
   const mobilePos =
-    typeof album.bannerHeroMobilePosition === "string" && album.bannerHeroMobilePosition.trim()
+    typeof album.bannerHeroMobilePosition === "string" &&
+    album.bannerHeroMobilePosition.trim()
       ? album.bannerHeroMobilePosition.trim()
       : "50% 50%";
 
@@ -78,9 +135,17 @@ function mapAlbumResponse(album) {
             },
           ]
         : []),
-      ...album.highlights.map((img) => ({ id: img.id, url: img.url, originalUrl: img.originalUrl || "" })),
+      ...album.highlights.map((img) => ({
+        id: img.id,
+        url: img.url,
+        originalUrl: img.originalUrl || "",
+      })),
       ...album.galleryTabs.flatMap((tab) =>
-        tab.images.map((img) => ({ id: img.id, url: img.url, originalUrl: img.originalUrl || "" }))
+        tab.images.map((img) => ({
+          id: img.id,
+          url: img.url,
+          originalUrl: img.originalUrl || "",
+        })),
       ),
     ],
     albumContent: {
@@ -95,18 +160,33 @@ function mapAlbumResponse(album) {
   };
 }
 
-async function getPublicProjectByShareToken(shareToken, accessToken) {
-  if (!shareToken) return { error: { status: 400, message: "shareToken required" } };
+async function getPublicProjectByShareToken(
+  shareToken,
+  accessToken,
+  paginationInput,
+) {
+  if (!shareToken)
+    return { error: { status: 400, message: "shareToken required" } };
 
-  const album = await Album.findOne({ shareToken, isPublished: true }).populate("studioUser", "studioName name");
+  const album = await Album.findOne({ shareToken, isPublished: true }).populate(
+    "studioUser",
+    "studioName name",
+  );
   if (album) return mapAlbumResponse(album);
 
   const project = await Project.findOne({ shareToken, isPublished: true })
     .populate("template")
     .populate("studioUser", "studioName name");
   if (!project) return { error: { status: 404, message: "Project not found" } };
-  const pinGate = photoSelectionPin.assertPhotoSelectionPinAccess(project, accessToken);
+  const pinGate = photoSelectionPin.assertPhotoSelectionPinAccess(
+    project,
+    accessToken,
+  );
   if (pinGate.error) return pinGate;
+  const { photoSelection, photoSelectionPage } = buildPublicPhotoSelectionPage(
+    project,
+    paginationInput,
+  );
   return {
     project: {
       id: project._id,
@@ -122,23 +202,34 @@ async function getPublicProjectByShareToken(shareToken, accessToken) {
       url: img.url,
       originalUrl: img.originalUrl || "",
     })),
-    photoSelection: safePublicPhotoSelection(project),
+    photoSelection,
+    photoSelectionPage,
   };
 }
 
-async function getPublicProjectBySlug(rawSlug, accessToken) {
+async function getPublicProjectBySlug(rawSlug, accessToken, paginationInput) {
   const slug = normalizeSlug(rawSlug);
   if (!slug) return { error: { status: 400, message: "slug required" } };
 
-  const album = await Album.findOne({ slug, isPublished: true }).populate("studioUser", "studioName name");
+  const album = await Album.findOne({ slug, isPublished: true }).populate(
+    "studioUser",
+    "studioName name",
+  );
   if (album) return mapAlbumResponse(album);
 
   const project = await Project.findOne({ slug, isPublished: true })
     .populate("template")
     .populate("studioUser", "studioName name");
   if (!project) return { error: { status: 404, message: "Project not found" } };
-  const pinGate = photoSelectionPin.assertPhotoSelectionPinAccess(project, accessToken);
+  const pinGate = photoSelectionPin.assertPhotoSelectionPinAccess(
+    project,
+    accessToken,
+  );
   if (pinGate.error) return pinGate;
+  const { photoSelection, photoSelectionPage } = buildPublicPhotoSelectionPage(
+    project,
+    paginationInput,
+  );
   return {
     project: {
       id: project._id,
@@ -153,30 +244,44 @@ async function getPublicProjectBySlug(rawSlug, accessToken) {
       url: img.url,
       originalUrl: img.originalUrl || "",
     })),
-    photoSelection: safePublicPhotoSelection(project),
+    photoSelection,
+    photoSelectionPage,
   };
 }
 
 function applyPublicPhotoSelectionPatch(photo, payload) {
   const { picked, fav } = payload || {};
   if (typeof picked !== "boolean" && typeof fav !== "boolean") {
-    return { error: { status: 400, message: "Provide picked and/or fav as boolean" } };
+    return {
+      error: { status: 400, message: "Provide picked and/or fav as boolean" },
+    };
   }
   if (typeof picked === "boolean") photo.picked = picked;
   if (typeof fav === "boolean") photo.fav = fav;
   return null;
 }
 
-async function updatePublicPhotoSelectionPhoto(shareToken, photoId, payload, accessToken) {
-  if (!shareToken) return { error: { status: 400, message: "shareToken required" } };
+async function updatePublicPhotoSelectionPhoto(
+  shareToken,
+  photoId,
+  payload,
+  accessToken,
+) {
+  if (!shareToken)
+    return { error: { status: 400, message: "shareToken required" } };
   if (!photoId) return { error: { status: 400, message: "photoId required" } };
 
   const project = await Project.findOne({ shareToken, isPublished: true });
   if (!project) return { error: { status: 404, message: "Project not found" } };
-  const pinGate = photoSelectionPin.assertPhotoSelectionPinAccess(project, accessToken);
+  const pinGate = photoSelectionPin.assertPhotoSelectionPinAccess(
+    project,
+    accessToken,
+  );
   if (pinGate.error) return pinGate;
 
-  const photo = (project.photoSelection?.photos || []).find((p) => p.id === photoId);
+  const photo = (project.photoSelection?.photos || []).find(
+    (p) => p.id === photoId,
+  );
   if (!photo) return { error: { status: 404, message: "Photo not found" } };
 
   const patchErr = applyPublicPhotoSelectionPatch(photo, payload);
@@ -211,22 +316,30 @@ function albumImages(album) {
   return [
     ...(album?.bannerImage ? [album.bannerImage] : []),
     ...(album?.highlights || []),
-    ...((album?.galleryTabs || []).flatMap((tab) => tab.images || [])),
+    ...(album?.galleryTabs || []).flatMap((tab) => tab.images || []),
   ];
 }
 
-function resolveAlbumImageDownloadFromAlbum(album, imageId, variant = "optimized") {
+function resolveAlbumImageDownloadFromAlbum(
+  album,
+  imageId,
+  variant = "optimized",
+) {
   if (!imageId) return { error: { status: 400, message: "imageId required" } };
-  const image = albumImages(album).find((img) => String(img?.id || "") === String(imageId));
+  const image = albumImages(album).find(
+    (img) => String(img?.id || "") === String(imageId),
+  );
   if (!image) return { error: { status: 404, message: "Image not found" } };
 
   const sourceUrl =
     variant === "original"
       ? image.originalUrl || image.url
       : image.url || image.originalUrl;
-  if (!sourceUrl) return { error: { status: 404, message: "Image URL not found" } };
+  if (!sourceUrl)
+    return { error: { status: 404, message: "Image URL not found" } };
 
-  const rawBase = sanitizeFilename(image.originalName || image.id || "image") || "image";
+  const rawBase =
+    sanitizeFilename(image.originalName || image.id || "image") || "image";
   const base = rawBase.replace(/\.[^.]+$/, "") || "image";
   const ext = extensionFromMime(image.mimeType);
   const fileName =
@@ -241,17 +354,29 @@ function resolveAlbumImageDownloadFromAlbum(album, imageId, variant = "optimized
   };
 }
 
-async function getPublicPhotoSelectionBySlug(rawSlug, accessToken) {
+async function getPublicPhotoSelectionBySlug(
+  rawSlug,
+  accessToken,
+  paginationInput,
+) {
   const slug = normalizeSlug(rawSlug);
   if (!slug) return { error: { status: 400, message: "slug required" } };
 
   const project = await Project.findOne({ slug, isPublished: true })
     .populate("template")
     .populate("studioUser", "studioName name");
-  if (!project?.photoSelection) return { error: { status: 404, message: "Project not found" } };
+  if (!project?.photoSelection)
+    return { error: { status: 404, message: "Project not found" } };
 
-  const pinGate = photoSelectionPin.assertPhotoSelectionPinAccess(project, accessToken);
+  const pinGate = photoSelectionPin.assertPhotoSelectionPinAccess(
+    project,
+    accessToken,
+  );
   if (pinGate.error) return pinGate;
+  const { photoSelection, photoSelectionPage } = buildPublicPhotoSelectionPage(
+    project,
+    paginationInput,
+  );
 
   return {
     project: {
@@ -267,21 +392,32 @@ async function getPublicPhotoSelectionBySlug(rawSlug, accessToken) {
       url: img.url,
       originalUrl: img.originalUrl || "",
     })),
-    photoSelection: safePublicPhotoSelection(project),
+    photoSelection,
+    photoSelectionPage,
   };
 }
 
-async function updatePublicPhotoSelectionPhotoBySlug(rawSlug, photoId, payload, accessToken) {
+async function updatePublicPhotoSelectionPhotoBySlug(
+  rawSlug,
+  photoId,
+  payload,
+  accessToken,
+) {
   const slug = normalizeSlug(rawSlug);
   if (!slug) return { error: { status: 400, message: "slug required" } };
   if (!photoId) return { error: { status: 400, message: "photoId required" } };
 
   const project = await Project.findOne({ slug, isPublished: true });
   if (!project) return { error: { status: 404, message: "Project not found" } };
-  const pinGate = photoSelectionPin.assertPhotoSelectionPinAccess(project, accessToken);
+  const pinGate = photoSelectionPin.assertPhotoSelectionPinAccess(
+    project,
+    accessToken,
+  );
   if (pinGate.error) return pinGate;
 
-  const photo = (project.photoSelection?.photos || []).find((p) => p.id === photoId);
+  const photo = (project.photoSelection?.photos || []).find(
+    (p) => p.id === photoId,
+  );
   if (!photo) return { error: { status: 404, message: "Photo not found" } };
 
   const patchErr = applyPublicPhotoSelectionPatch(photo, payload);
@@ -297,26 +433,38 @@ async function updatePublicPhotoSelectionPhotoBySlug(rawSlug, photoId, payload, 
   };
 }
 
-async function resolvePublicPhotoSelectionDownloadBySlug(rawSlug, photoId, variant = "optimized", accessToken) {
+async function resolvePublicPhotoSelectionDownloadBySlug(
+  rawSlug,
+  photoId,
+  variant = "optimized",
+  accessToken,
+) {
   const slug = normalizeSlug(rawSlug);
   if (!slug) return { error: { status: 400, message: "slug required" } };
   if (!photoId) return { error: { status: 400, message: "photoId required" } };
 
   const project = await Project.findOne({ slug, isPublished: true });
   if (!project) return { error: { status: 404, message: "Project not found" } };
-  const pinGate = photoSelectionPin.assertPhotoSelectionPinAccess(project, accessToken);
+  const pinGate = photoSelectionPin.assertPhotoSelectionPinAccess(
+    project,
+    accessToken,
+  );
   if (pinGate.error) return pinGate;
 
-  const photo = (project.photoSelection?.photos || []).find((p) => p.id === photoId);
+  const photo = (project.photoSelection?.photos || []).find(
+    (p) => p.id === photoId,
+  );
   if (!photo) return { error: { status: 404, message: "Photo not found" } };
 
   const sourceUrl =
     variant === "original"
       ? photo.originalUrl || photo.url
       : photo.url || photo.originalUrl;
-  if (!sourceUrl) return { error: { status: 404, message: "Photo URL not found" } };
+  if (!sourceUrl)
+    return { error: { status: 404, message: "Photo URL not found" } };
 
-  const rawBase = sanitizeFilename(photo.originalName || photo.id || "photo") || "photo";
+  const rawBase =
+    sanitizeFilename(photo.originalName || photo.id || "photo") || "photo";
   const base = rawBase.replace(/\.[^.]+$/, "") || "photo";
   const ext = extensionFromMime(photo.mimeType);
   const fileName =
@@ -331,14 +479,23 @@ async function resolvePublicPhotoSelectionDownloadBySlug(rawSlug, photoId, varia
   };
 }
 
-async function resolvePublicAlbumImageDownload(shareToken, imageId, variant = "optimized") {
-  if (!shareToken) return { error: { status: 400, message: "shareToken required" } };
+async function resolvePublicAlbumImageDownload(
+  shareToken,
+  imageId,
+  variant = "optimized",
+) {
+  if (!shareToken)
+    return { error: { status: 400, message: "shareToken required" } };
   const album = await Album.findOne({ shareToken, isPublished: true });
   if (!album) return { error: { status: 404, message: "Album not found" } };
   return resolveAlbumImageDownloadFromAlbum(album, imageId, variant);
 }
 
-async function resolvePublicAlbumImageDownloadBySlug(rawSlug, imageId, variant = "optimized") {
+async function resolvePublicAlbumImageDownloadBySlug(
+  rawSlug,
+  imageId,
+  variant = "optimized",
+) {
   const slug = normalizeSlug(rawSlug);
   if (!slug) return { error: { status: 400, message: "slug required" } };
   const album = await Album.findOne({ slug, isPublished: true });
@@ -346,25 +503,38 @@ async function resolvePublicAlbumImageDownloadBySlug(rawSlug, imageId, variant =
   return resolveAlbumImageDownloadFromAlbum(album, imageId, variant);
 }
 
-async function resolvePublicPhotoSelectionDownload(shareToken, photoId, variant = "optimized", accessToken) {
-  if (!shareToken) return { error: { status: 400, message: "shareToken required" } };
+async function resolvePublicPhotoSelectionDownload(
+  shareToken,
+  photoId,
+  variant = "optimized",
+  accessToken,
+) {
+  if (!shareToken)
+    return { error: { status: 400, message: "shareToken required" } };
   if (!photoId) return { error: { status: 400, message: "photoId required" } };
 
   const project = await Project.findOne({ shareToken, isPublished: true });
   if (!project) return { error: { status: 404, message: "Project not found" } };
-  const pinGate = photoSelectionPin.assertPhotoSelectionPinAccess(project, accessToken);
+  const pinGate = photoSelectionPin.assertPhotoSelectionPinAccess(
+    project,
+    accessToken,
+  );
   if (pinGate.error) return pinGate;
 
-  const photo = (project.photoSelection?.photos || []).find((p) => p.id === photoId);
+  const photo = (project.photoSelection?.photos || []).find(
+    (p) => p.id === photoId,
+  );
   if (!photo) return { error: { status: 404, message: "Photo not found" } };
 
   const sourceUrl =
     variant === "original"
       ? photo.originalUrl || photo.url
       : photo.url || photo.originalUrl;
-  if (!sourceUrl) return { error: { status: 404, message: "Photo URL not found" } };
+  if (!sourceUrl)
+    return { error: { status: 404, message: "Photo URL not found" } };
 
-  const rawBase = sanitizeFilename(photo.originalName || photo.id || "photo") || "photo";
+  const rawBase =
+    sanitizeFilename(photo.originalName || photo.id || "photo") || "photo";
   const base = rawBase.replace(/\.[^.]+$/, "") || "photo";
   const ext = extensionFromMime(photo.mimeType);
   const fileName =
@@ -387,31 +557,52 @@ async function verifyPhotoSelectionPinBySlug(rawSlug, plainPin) {
   }
 
   const project = await Project.findOne({ slug, isPublished: true });
-  if (!project?.photoSelection) return { error: { status: 404, message: "Project not found" } };
+  if (!project?.photoSelection)
+    return { error: { status: 404, message: "Project not found" } };
   if (!photoSelectionPin.photoSelectionPinActive(project)) {
-    return { error: { status: 400, message: "This selection does not require a PIN" } };
+    return {
+      error: { status: 400, message: "This selection does not require a PIN" },
+    };
   }
-  if (!photoSelectionPin.verifyPhotoSelectionPin(plainPin.trim(), project.photoSelection.pinHash)) {
+  if (
+    !photoSelectionPin.verifyPhotoSelectionPin(
+      plainPin.trim(),
+      project.photoSelection.pinHash,
+    )
+  ) {
     return { error: { status: 401, message: "Incorrect PIN" } };
   }
-  return { accessToken: photoSelectionPin.issuePhotoSelectionAccessToken(project._id) };
+  return {
+    accessToken: photoSelectionPin.issuePhotoSelectionAccessToken(project._id),
+  };
 }
 
 async function verifyPhotoSelectionPinByShareToken(shareToken, plainPin) {
-  if (!shareToken) return { error: { status: 400, message: "shareToken required" } };
+  if (!shareToken)
+    return { error: { status: 400, message: "shareToken required" } };
   if (typeof plainPin !== "string" || !/^\d{4,8}$/.test(plainPin.trim())) {
     return { error: { status: 400, message: "PIN must be 4–8 digits" } };
   }
 
   const project = await Project.findOne({ shareToken, isPublished: true });
-  if (!project?.photoSelection) return { error: { status: 404, message: "Project not found" } };
+  if (!project?.photoSelection)
+    return { error: { status: 404, message: "Project not found" } };
   if (!photoSelectionPin.photoSelectionPinActive(project)) {
-    return { error: { status: 400, message: "This selection does not require a PIN" } };
+    return {
+      error: { status: 400, message: "This selection does not require a PIN" },
+    };
   }
-  if (!photoSelectionPin.verifyPhotoSelectionPin(plainPin.trim(), project.photoSelection.pinHash)) {
+  if (
+    !photoSelectionPin.verifyPhotoSelectionPin(
+      plainPin.trim(),
+      project.photoSelection.pinHash,
+    )
+  ) {
     return { error: { status: 401, message: "Incorrect PIN" } };
   }
-  return { accessToken: photoSelectionPin.issuePhotoSelectionAccessToken(project._id) };
+  return {
+    accessToken: photoSelectionPin.issuePhotoSelectionAccessToken(project._id),
+  };
 }
 
 module.exports = {
@@ -426,5 +617,6 @@ module.exports = {
   resolvePublicPhotoSelectionDownloadBySlug,
   verifyPhotoSelectionPinBySlug,
   verifyPhotoSelectionPinByShareToken,
-  bearerFromAuthorizationHeader: photoSelectionPin.bearerFromAuthorizationHeader,
+  bearerFromAuthorizationHeader:
+    photoSelectionPin.bearerFromAuthorizationHeader,
 };
