@@ -1,6 +1,10 @@
 const mongoose = require("mongoose");
 const crypto = require("crypto");
+const fs = require("fs");
+const os = require("os");
+const path = require("path");
 const sharp = require("sharp");
+const archiver = require("archiver");
 const Project = require("../models/Project");
 const { hashPhotoSelectionPin } = require("./photoSelectionPin");
 
@@ -51,6 +55,7 @@ const {
   downloadObjectBuffer,
   deleteObjectAtKey,
   createDirectUploadWriteUrl,
+  uploadLocalFileByProvider,
   safeName,
 } = require("./storageUploader");
 const { getActiveStorageProvider } = require("./storageSettings");
@@ -80,6 +85,26 @@ function validateSelectionPin(pin) {
     return { error: { status: 400, message: "PIN must be 4–8 digits" } };
   }
   return { pin: pin.trim() };
+}
+
+function extensionFromMime(mimeType) {
+  if (!mimeType) return "jpg";
+  if (mimeType.includes("jpeg") || mimeType === "image/jpg") return "jpg";
+  if (mimeType.includes("png")) return "png";
+  if (mimeType.includes("webp")) return "webp";
+  if (mimeType.includes("gif")) return "gif";
+  return "jpg";
+}
+
+function sanitizeFilename(name) {
+  return String(name || "")
+    .replace(/[/\\?%*:|"<>]/g, "-")
+    .trim();
+}
+
+function originalFileNameFromSource(rawName, fallbackBase, ext) {
+  const safe = sanitizeFilename(rawName || fallbackBase) || fallbackBase;
+  return /\.[a-z0-9]{1,8}$/i.test(safe) ? safe : `${safe}.${ext}`;
 }
 
 async function createProject(user, payload) {
@@ -524,6 +549,198 @@ async function deletePhotoSelectionProject(user, projectId) {
   return { ok: true };
 }
 
+async function resolvePhotoDownload(
+  user,
+  projectId,
+  photoId,
+  variant = "optimized",
+) {
+  const project = await getStudioProject(user, projectId);
+  if (!project) return { error: { status: 404, message: "Project not found" } };
+  if (!photoId) return { error: { status: 400, message: "photoId required" } };
+
+  const photo = (project.photoSelection?.photos || []).find(
+    (p) => p.id === photoId,
+  );
+  if (!photo) return { error: { status: 404, message: "Photo not found" } };
+
+  const sourceUrl =
+    variant === "original"
+      ? photo.originalUrl || photo.url
+      : photo.url || photo.originalUrl;
+  if (!sourceUrl)
+    return { error: { status: 404, message: "Photo URL not found" } };
+
+  const rawBase =
+    sanitizeFilename(photo.originalName || photo.id || "photo") || "photo";
+  const base = rawBase.replace(/\.[^.]+$/, "") || "photo";
+  const ext = extensionFromMime(photo.mimeType);
+  const originalFileName = originalFileNameFromSource(
+    photo.originalName || photo.id || "photo",
+    "photo",
+    ext,
+  );
+  const fileName =
+    variant === "original" ? originalFileName : `${base}-optimized.webp`;
+
+  return {
+    sourceUrl,
+    fileName,
+    mimeType: photo.mimeType || "",
+  };
+}
+
+async function resolveSelectedPhotosDownload(
+  user,
+  projectId,
+  variant = "optimized",
+) {
+  const project = await getStudioProject(user, projectId);
+  if (!project) return { error: { status: 404, message: "Project not found" } };
+
+  const pickedPhotos = (project.photoSelection?.photos || []).filter((p) =>
+    Boolean(p?.picked),
+  );
+  if (pickedPhotos.length === 0) {
+    return {
+      error: { status: 400, message: "No selected photos to download" },
+    };
+  }
+
+  const nameCounts = new Map();
+  const items = pickedPhotos
+    .map((photo) => {
+      const sourceUrl =
+        variant === "original"
+          ? photo.originalUrl || photo.url
+          : photo.url || photo.originalUrl;
+      if (!sourceUrl) return null;
+
+      const rawBase =
+        sanitizeFilename(photo.originalName || photo.id || "photo") || "photo";
+      const base = rawBase.replace(/\.[^.]+$/, "") || "photo";
+      const ext = extensionFromMime(photo.mimeType);
+      const originalFileName = originalFileNameFromSource(
+        photo.originalName || photo.id || "photo",
+        "photo",
+        ext,
+      );
+      const key = `${base}|${variant}|${ext}`;
+      const count = nameCounts.get(key) || 0;
+      nameCounts.set(key, count + 1);
+      const suffix = count > 0 ? `-${count + 1}` : "";
+      const fileName =
+        variant === "original"
+          ? suffix
+            ? originalFileName.replace(/(\.[a-z0-9]{1,8})$/i, `${suffix}$1`)
+            : originalFileName
+          : `${base}${suffix}-optimized.webp`;
+
+      return {
+        sourceUrl,
+        fileName,
+      };
+    })
+    .filter(Boolean);
+
+  if (items.length === 0) {
+    return {
+      error: { status: 404, message: "Selected photos are missing URLs" },
+    };
+  }
+
+  const rawProjectName = sanitizeFilename(project.name || "selected-photos");
+  const safeProjectName =
+    rawProjectName.replace(/\.[^.]+$/, "") || "selected-photos";
+  const zipFileName =
+    variant === "original"
+      ? `${safeProjectName}-selected-original.zip`
+      : `${safeProjectName}-selected-optimized.zip`;
+
+  return {
+    items,
+    zipFileName,
+  };
+}
+
+async function buildSelectedPhotosDownloadArtifact(
+  user,
+  projectId,
+  variant = "optimized",
+  onProgress,
+) {
+  const resolved = await resolveSelectedPhotosDownload(
+    user,
+    projectId,
+    variant,
+  );
+  if (resolved.error) return resolved;
+
+  const tmpDir = await fs.promises.mkdtemp(path.join(os.tmpdir(), "psdl-"));
+  const zipPath = path.join(tmpDir, resolved.zipFileName);
+  const output = fs.createWriteStream(zipPath);
+  const archive = archiver("zip", { zlib: { level: 9 } });
+
+  await new Promise((resolve, reject) => {
+    output.on("close", resolve);
+    output.on("error", reject);
+    archive.on("error", reject);
+    archive.pipe(output);
+
+    (async () => {
+      if (onProgress) {
+        await onProgress({
+          total: resolved.items.length,
+          done: 0,
+          message: "Preparing selected photos...",
+        });
+      }
+      let done = 0;
+      for (const item of resolved.items) {
+        try {
+          const upstream = await fetch(item.sourceUrl);
+          if (upstream.ok) {
+            const arrayBuffer = await upstream.arrayBuffer();
+            archive.append(Buffer.from(arrayBuffer), { name: item.fileName });
+          }
+        } finally {
+          done += 1;
+          if (onProgress) {
+            await onProgress({
+              total: resolved.items.length,
+              done,
+              message: `Bundling ${done}/${resolved.items.length}`,
+            });
+          }
+        }
+      }
+      await archive.finalize();
+    })().catch(reject);
+  });
+
+  try {
+    const provider = await getActiveStorageProvider();
+    const key = `studio/${String(user.id)}/photo-selection/${String(projectId)}/downloads/${safeName(resolved.zipFileName)}`;
+    const downloadUrl = await uploadLocalFileByProvider({
+      filePath: zipPath,
+      contentType: "application/zip",
+      key,
+      provider,
+    });
+
+    return {
+      downloadUrl,
+      fileName: resolved.zipFileName,
+      totalFiles: resolved.items.length,
+      variant,
+    };
+  } finally {
+    await fs.promises
+      .rm(tmpDir, { recursive: true, force: true })
+      .catch(() => {});
+  }
+}
+
 async function publishProject(user, projectId) {
   const project = await getStudioProject(user, projectId);
   if (!project) return { error: { status: 404, message: "Project not found" } };
@@ -550,6 +767,9 @@ module.exports = {
   commitPhotoDirectUploads,
   updatePhoto,
   uploadPhotoSelectionOgImage,
+  resolvePhotoDownload,
+  resolveSelectedPhotosDownload,
+  buildSelectedPhotosDownloadArtifact,
   deletePhoto,
   deletePhotoSelectionProject,
   publishProject,
