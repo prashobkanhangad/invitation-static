@@ -150,6 +150,46 @@ async function uploadOgImage(req, res) {
   }
 }
 
+async function prepareOgImageDirectUpload(req, res) {
+  try {
+    const result =
+      await studioPhotoSelectionService.preparePhotoSelectionOgImageDirectUpload(
+        req.user,
+        req.params.projectId,
+        req.body,
+      );
+    if (result.error)
+      return res
+        .status(result.error.status)
+        .json({ message: result.error.message });
+    return res.json(result);
+  } catch (err) {
+    // eslint-disable-next-line no-console
+    console.error(err);
+    return res.status(500).json({ message: err.message || "Server error" });
+  }
+}
+
+async function commitOgImageDirectUpload(req, res) {
+  try {
+    const result =
+      await studioPhotoSelectionService.commitPhotoSelectionOgImageDirectUpload(
+        req.user,
+        req.params.projectId,
+        req.body,
+      );
+    if (result.error)
+      return res
+        .status(result.error.status)
+        .json({ message: result.error.message });
+    return res.json(result);
+  } catch (err) {
+    // eslint-disable-next-line no-console
+    console.error(err);
+    return res.status(500).json({ message: err.message || "Server error" });
+  }
+}
+
 async function deletePhoto(req, res) {
   const result = await studioPhotoSelectionService.deletePhoto(
     req.user,
@@ -272,6 +312,8 @@ module.exports = {
   commitPhotoDirectUpload,
   updatePhoto,
   uploadOgImage,
+  prepareOgImageDirectUpload,
+  commitOgImageDirectUpload,
   downloadPhoto,
   downloadSelectedPhotos,
   deletePhoto,

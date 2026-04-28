@@ -497,6 +497,81 @@ async function uploadPhotoSelectionOgImage(user, projectId, file) {
   return { ogImage: project.photoSelection.ogImage, project };
 }
 
+async function preparePhotoSelectionOgImageDirectUpload(user, projectId, payload) {
+  const project = await getStudioProject(user, projectId);
+  if (!project) return { error: { status: 404, message: "Project not found" } };
+
+  const meta = payload?.file;
+  const originalName = typeof meta?.originalName === "string" ? meta.originalName : "og-image.jpg";
+  const mimeType = typeof meta?.mimeType === "string" ? meta.mimeType : "image/jpeg";
+  const byteSize = Number(meta?.byteSize);
+  if (!mimeType.startsWith("image/")) return { error: { status: 400, message: "OG image must be an image" } };
+  if (!Number.isFinite(byteSize) || byteSize <= 0 || byteSize > MAX_DIRECT_FILE_BYTES) {
+    return { error: { status: 400, message: "Invalid OG image file size (max 100MB)" } };
+  }
+
+  const provider = await getActiveStorageProvider();
+  const ownerKey = String(user.id || "unknown-user");
+  const projectKey = String(project._id);
+  const prefix = stagingPrefixPhotoSelection(ownerKey, projectKey);
+  const key = `${prefix}/og_${crypto.randomBytes(14).toString("hex")}_${safeName(originalName)}`;
+  const { uploadUrl, method, headers } = await createDirectUploadWriteUrl({
+    key,
+    contentType: mimeType,
+    provider,
+  });
+
+  return {
+    upload: {
+      key,
+      originalName,
+      mimeType,
+      byteSize,
+      uploadUrl,
+      method,
+      headers,
+    },
+    expiresInSeconds: 1200,
+  };
+}
+
+async function commitPhotoSelectionOgImageDirectUpload(user, projectId, payload) {
+  const project = await getStudioProject(user, projectId);
+  if (!project) return { error: { status: 404, message: "Project not found" } };
+
+  const key = typeof payload?.key === "string" ? payload.key : "";
+  const originalName = typeof payload?.originalName === "string" ? payload.originalName : "og-image.jpg";
+  const mimeType = typeof payload?.mimeType === "string" ? payload.mimeType : "image/jpeg";
+
+  const ownerKey = String(user.id || "unknown-user");
+  const projectKey = String(project._id);
+  const expectedPrefix = stagingPrefixPhotoSelection(ownerKey, projectKey);
+  if (!key || !key.startsWith(`${expectedPrefix}/og_`)) {
+    return { error: { status: 400, message: "Invalid storage key" } };
+  }
+
+  const provider = await getActiveStorageProvider();
+  const folder = `photo-selection/${ownerKey}/${projectKey}/og`;
+
+  let buffer;
+  try {
+    buffer = await downloadObjectBuffer({ key, provider });
+  } catch {
+    return { error: { status: 400, message: "Could not read uploaded OG image" } };
+  }
+  try {
+    await sharp(buffer).metadata();
+  } catch {
+    await deleteObjectAtKey({ key, provider }).catch(() => {});
+    return { error: { status: 400, message: "Not a valid image" } };
+  }
+
+  const file = { buffer, originalname: originalName, mimetype: mimeType };
+  const uploaded = await uploadPhotoSelectionOgImage(user, projectId, file);
+  await deleteObjectAtKey({ key, provider }).catch(() => {});
+  return uploaded;
+}
+
 function objectKeyFromUrl(url) {
   if (!url || typeof url !== "string") return "";
   try {
@@ -775,6 +850,8 @@ module.exports = {
   commitPhotoDirectUploads,
   updatePhoto,
   uploadPhotoSelectionOgImage,
+  preparePhotoSelectionOgImageDirectUpload,
+  commitPhotoSelectionOgImageDirectUpload,
   resolvePhotoDownload,
   resolveSelectedPhotosDownload,
   buildSelectedPhotosDownloadArtifact,

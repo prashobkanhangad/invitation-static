@@ -36,7 +36,10 @@ import {
   StatusBadge,
 } from "@/components/studio-dashboard/blocks";
 import { getStudioToken, studioApiFetch } from "@/utils/studioApi";
-import { uploadPhotoSelectionDirect } from "@/utils/studioDirectUpload";
+import {
+  uploadPhotoSelectionDirect,
+  uploadPhotoSelectionOgImageDirect,
+} from "@/utils/studioDirectUpload";
 import { API_BASE_URL } from "@/utils/api";
 
 const STUDIO_TABLE_SHIMMER =
@@ -600,15 +603,11 @@ export default function StudioPhotoSelectionSection() {
     setOgImageUploadError(null);
     setOgImageUploading(true);
     try {
-      const formData = new FormData();
-      formData.append("image", file);
-      const resp = await studioApiFetch<{ ogImage?: any; project?: any }>(
-        `/api/studio/photo-selection/projects/${encodeURIComponent(activeProjectId)}/og-image`,
-        {
-          method: "POST",
-          formData,
-        },
-      );
+      const resp = await uploadPhotoSelectionOgImageDirect({
+        projectId: activeProjectId,
+        file,
+        api: studioApiFetch,
+      });
       const mapped = resp?.project ? mapApiProjectToUi(resp.project) : null;
       setProjects((prev) =>
         prev.map((p) => {

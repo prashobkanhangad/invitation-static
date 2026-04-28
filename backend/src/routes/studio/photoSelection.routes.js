@@ -26,6 +26,14 @@ router.post(
   studioPhotoSelectionController.uploadPhotos,
 );
 router.post(
+  "/projects/:projectId/og-image/direct-upload/prepare",
+  studioPhotoSelectionController.prepareOgImageDirectUpload,
+);
+router.post(
+  "/projects/:projectId/og-image/direct-upload/commit",
+  studioPhotoSelectionController.commitOgImageDirectUpload,
+);
+router.post(
   "/projects/:projectId/og-image",
   uploadMemory.single("image"),
   studioPhotoSelectionController.uploadOgImage,

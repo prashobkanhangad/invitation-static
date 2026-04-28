@@ -347,8 +347,8 @@ export default function PublicPhotoSelectionScreen({
 
   return (
     <main className="flex min-h-screen flex-col bg-[#f7f4ef] antialiased text-stone-900">
-      <section className="border-b border-black/5 bg-gradient-to-b from-[#faf6ef] to-[#f7f4ef] px-4 pb-5 pt-6 sm:px-6 sm:pb-6 sm:pt-8">
-        <div className="mx-auto max-w-6xl">
+      <section className="border-b border-black/5 bg-gradient-to-b from-[#faf6ef] to-[#f7f4ef] px-3 pb-4 pt-5 sm:px-4 sm:pb-5 sm:pt-6 lg:px-5">
+        <div className="w-full">
           {loading ? (
             <div className="space-y-3">
               <div className={`h-2.5 w-40 rounded-md ${shimmerBar}`} />
@@ -360,15 +360,15 @@ export default function PublicPhotoSelectionScreen({
           ) : (
             <div>
               {studioName.trim() ? (
-                <p className="mb-1.5 text-sm font-semibold tracking-wide text-stone-800 sm:text-base">
+                <p className="mb-1 text-sm font-semibold tracking-wide text-stone-800 sm:text-base">
                   {studioName.trim()}
                 </p>
               ) : null}
               <h1
                 className={
                   studioName.trim()
-                    ? "mt-0 text-3xl font-display sm:text-4xl"
-                    : "text-3xl font-display sm:text-4xl"
+                    ? "mt-0 text-2xl font-display leading-tight sm:text-3xl lg:text-4xl"
+                    : "text-2xl font-display leading-tight sm:text-3xl lg:text-4xl"
                 }
               >
                 {projectName || "Gallery"}
@@ -378,7 +378,7 @@ export default function PublicPhotoSelectionScreen({
                   {subheading}
                 </p>
               ) : null}
-              <p className="mt-1.5 text-xs font-semibold uppercase tracking-wide text-stone-500">
+              <p className="mt-2 text-xs font-semibold uppercase tracking-wide text-stone-500 sm:text-sm">
                 {headerSelectedCount} selected · {headerTotalPhotoCount} photos
               </p>
             </div>
@@ -386,8 +386,8 @@ export default function PublicPhotoSelectionScreen({
         </div>
       </section>
 
-      <section className="flex-1 px-4 py-5 sm:px-6 sm:py-6">
-        <div className="mx-auto max-w-6xl">
+      <section className="flex-1 px-3 py-4 sm:px-4 sm:py-5 lg:px-5">
+        <div className="w-full">
           {loading ? (
             <div className="space-y-6">
               <div className="flex gap-2 overflow-x-auto pb-1">
@@ -398,7 +398,7 @@ export default function PublicPhotoSelectionScreen({
                   />
                 ))}
               </div>
-              <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
+              <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-7">
                 {Array.from({ length: 12 }).map((_, i) => (
                   <div
                     key={i}
@@ -449,7 +449,7 @@ export default function PublicPhotoSelectionScreen({
                 </div>
               ) : (
                 <>
-                  <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
+                  <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-7">
                     {photosForActiveTab.map((photo) => (
                       <div
                         key={photo.id}
@@ -712,8 +712,8 @@ export default function PublicPhotoSelectionScreen({
         </div>
       ) : null}
 
-      <footer className="mt-auto border-t border-stone-200/70 bg-[#efece4] px-4 py-6 sm:px-6">
-        <div className="mx-auto max-w-6xl text-center">
+      <footer className="mt-auto border-t border-stone-200/70 bg-[#efece4] px-3 py-6 sm:px-4 lg:px-5">
+        <div className="w-full text-center">
           <p className="text-xs text-stone-500 sm:text-sm">
             Powered by{" "}
             <Link
