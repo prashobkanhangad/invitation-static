@@ -8,6 +8,7 @@ const {
   PutObjectCommand,
   GetObjectCommand,
   DeleteObjectCommand,
+  ListObjectsV2Command,
 } = require("@aws-sdk/client-s3");
 const { getSignedUrl } = require("@aws-sdk/s3-request-presigner");
 const { Storage } = require("@google-cloud/storage");
@@ -213,6 +214,48 @@ async function deleteObjectAtKey({ key, provider }) {
   await client.send(new DeleteObjectCommand({ Bucket: awsBucket, Key: key }));
 }
 
+async function calculatePrefixSizeByProvider({ prefix, provider }) {
+  const safePrefix = String(prefix || "").replace(/^\/+/, "");
+  if (!safePrefix) return 0;
+
+  if (provider === "gcp_storage") {
+    const bucket = buildGcpBucket();
+    let total = 0;
+    let pageToken = undefined;
+    do {
+      const [files, nextQuery] = await bucket.getFiles({
+        prefix: safePrefix,
+        autoPaginate: false,
+        maxResults: 1000,
+        pageToken,
+      });
+      for (const file of files) {
+        total += Number(file?.metadata?.size || 0);
+      }
+      pageToken = nextQuery?.pageToken;
+    } while (pageToken);
+    return total;
+  }
+
+  const awsBucket = process.env.AWS_S3_BUCKET;
+  if (!awsBucket) throw new Error("Missing AWS_S3_BUCKET");
+  const client = buildAwsClient();
+  let continuationToken = undefined;
+  let total = 0;
+  do {
+    const res = await client.send(
+      new ListObjectsV2Command({
+        Bucket: awsBucket,
+        Prefix: safePrefix,
+        ContinuationToken: continuationToken,
+      })
+    );
+    for (const item of res.Contents || []) total += Number(item?.Size || 0);
+    continuationToken = res.IsTruncated ? res.NextContinuationToken : undefined;
+  } while (continuationToken);
+  return total;
+}
+
 async function uploadImageByProvider({ req, file, folder, provider }) {
   const key = `${folder}/${safeName(file.originalname)}`;
   return uploadBufferByProvider({
@@ -266,5 +309,6 @@ module.exports = {
   createDirectUploadWriteUrl,
   downloadObjectBuffer,
   deleteObjectAtKey,
+  calculatePrefixSizeByProvider,
   uploadLocalFileByProvider,
 };

@@ -1,5 +1,6 @@
 import {
   BookOpen,
+  CreditCard,
   Globe2,
   Heart,
   Image as ImageIcon,
@@ -51,6 +52,12 @@ export const studioNavItems: StudioNavItem[] = [
     label: "Client invitations",
     description: "Wedding & event pages",
     icon: Heart,
+  },
+  {
+    href: "/studio/dashboard/plans",
+    label: "Plan and Usage",
+    description: "Pricing and storage plans",
+    icon: CreditCard,
   },
   {
     href: "/studio/dashboard/account",

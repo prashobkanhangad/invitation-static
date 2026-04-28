@@ -23,6 +23,11 @@ function normalizeSlug(input) {
   return input.trim().toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 60);
 }
 
+function toValidByteSize(value) {
+  const n = Number(value);
+  return Number.isFinite(n) && n > 0 ? Math.round(n) : 0;
+}
+
 async function getStudioAlbum(user, albumId) {
   const q = { _id: albumId };
   if (user.role === "studio") q.studioUser = user.id;
@@ -129,6 +134,7 @@ async function uploadBanner(user, albumId, file, req) {
     thumbUrl,
     originalName: file.originalname || "",
     mimeType: file.mimetype || "",
+    byteSize: toValidByteSize(file.size || file.buffer?.length),
     order: 0,
   };
   await album.save();
@@ -159,6 +165,7 @@ async function uploadHighlights(user, albumId, files, req) {
       thumbUrl,
       originalName: file.originalname || "",
       mimeType: file.mimetype || "",
+      byteSize: toValidByteSize(file.size || file.buffer?.length),
       order: start + i,
     });
   }
@@ -231,6 +238,7 @@ async function uploadTabImages(user, albumId, tabId, files, req) {
       thumbUrl,
       originalName: file.originalname || "",
       mimeType: file.mimetype || "",
+      byteSize: toValidByteSize(file.size || file.buffer?.length),
       order: start + i,
     });
   }
@@ -329,6 +337,7 @@ async function commitBannerDirectUpload(user, albumId, payload, options = {}) {
     thumbUrl,
     originalName,
     mimeType,
+    byteSize: toValidByteSize(payload?.byteSize || payload?.file?.byteSize || buffer?.length),
     order: 0,
   };
   await album.save();
@@ -414,6 +423,7 @@ async function commitHighlightsDirectUploads(user, albumId, payload, options = {
       thumbUrl,
       originalName,
       mimeType,
+      byteSize: toValidByteSize(item?.byteSize || buffer?.length),
       order: start + i,
     });
     if (onProgress) await onProgress({ total: items.length, done: i + 1, message: `Processed ${i + 1}/${items.length}` });
@@ -505,6 +515,7 @@ async function commitGalleryTabDirectUploads(user, albumId, tabId, payload, opti
       thumbUrl,
       originalName,
       mimeType,
+      byteSize: toValidByteSize(item?.byteSize || buffer?.length),
       order: start + i,
     });
     if (onProgress) await onProgress({ total: items.length, done: i + 1, message: `Processed ${i + 1}/${items.length}` });

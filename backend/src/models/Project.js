@@ -8,6 +8,7 @@ const clientProjectImageSchema = new mongoose.Schema(
     thumbUrl: { type: String, default: "" },
     originalName: { type: String, default: "" },
     mimeType: { type: String, default: "" },
+    byteSize: { type: Number, default: 0, min: 0 },
   },
   { _id: false }
 );
@@ -29,6 +30,7 @@ const photoSelectionPhotoSchema = new mongoose.Schema(
     thumbUrl: { type: String, default: "" },
     originalName: { type: String, default: "" },
     mimeType: { type: String, default: "" },
+    byteSize: { type: Number, default: 0, min: 0 },
     tabId: { type: String, default: null },
     picked: { type: Boolean, default: false },
     fav: { type: Boolean, default: false },

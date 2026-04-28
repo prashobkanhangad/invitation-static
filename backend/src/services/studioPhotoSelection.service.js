@@ -107,6 +107,11 @@ function originalFileNameFromSource(rawName, fallbackBase, ext) {
   return /\.[a-z0-9]{1,8}$/i.test(safe) ? safe : `${safe}.${ext}`;
 }
 
+function toValidByteSize(value) {
+  const n = Number(value);
+  return Number.isFinite(n) && n > 0 ? Math.round(n) : 0;
+}
+
 async function createProject(user, payload) {
   const { name, goal = 0, pinEnabled: pinEnabledRaw, pin } = payload || {};
   if (!name || typeof name !== "string" || !name.trim()) {
@@ -236,6 +241,7 @@ async function uploadPhotos(user, projectId, files, payload, req) {
       thumbUrl,
       originalName: f.originalname || "",
       mimeType: f.mimetype || "",
+      byteSize: toValidByteSize(f.size || f.buffer?.length),
       tabId,
       picked: false,
       fav: false,
@@ -408,6 +414,7 @@ async function commitPhotoDirectUploads(
       thumbUrl,
       originalName,
       mimeType,
+      byteSize: toValidByteSize(item?.byteSize || buffer?.length),
       tabId,
       picked: false,
       fav: false,
@@ -468,6 +475,7 @@ async function uploadPhotoSelectionOgImage(user, projectId, file) {
     thumbUrl,
     originalName: file.originalname || "",
     mimeType: file.mimetype || "",
+    byteSize: toValidByteSize(file.size || file.buffer?.length),
   };
   await project.save();
 

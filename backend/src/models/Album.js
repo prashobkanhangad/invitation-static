@@ -8,6 +8,7 @@ const albumImageSchema = new mongoose.Schema(
     thumbUrl: { type: String, default: "" },
     originalName: { type: String, default: "" },
     mimeType: { type: String, default: "" },
+    byteSize: { type: Number, default: 0, min: 0 },
     order: { type: Number, default: 0 },
   },
   { _id: false }

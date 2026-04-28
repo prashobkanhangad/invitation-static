@@ -6,6 +6,7 @@ const morgan = require("morgan");
 
 const { connectDB } = require("./config/db");
 const { seedTemplatesIfNeeded } = require("./seed/templates.seed");
+const { seedDefaultPlansIfEmpty } = require("./services/plans.service");
 
 const templatesRoutes = require("./routes/templates.routes");
 const authRoutes = require("./routes/auth.routes");
@@ -18,6 +19,7 @@ const studioAlbumsRoutes = require("./routes/studio/albums.routes");
 const studioPhotoSelectionRoutes = require("./routes/studio/photoSelection.routes");
 const studioAccountRoutes = require("./routes/studio/account.routes");
 const studioUploadJobsRoutes = require("./routes/studio/uploadJobs.routes");
+const studioPlansRoutes = require("./routes/studio/plans.routes");
 
 const app = express();
 
@@ -56,6 +58,7 @@ app.use("/api/studio/albums", studioAlbumsRoutes);
 app.use("/api/studio/photo-selection", studioPhotoSelectionRoutes);
 app.use("/api/studio/account", studioAccountRoutes);
 app.use("/api/studio/upload-jobs", studioUploadJobsRoutes);
+app.use("/api/studio/plans", studioPlansRoutes);
 app.use("/api/public", publicProjectsRoutes);
 
 // Error handler for multer + general API errors.
@@ -71,6 +74,7 @@ app.use((err, _req, res, _next) => {
 async function start() {
   await connectDB();
   await seedTemplatesIfNeeded();
+  await seedDefaultPlansIfEmpty();
 
   app.listen(PORT, () => {
     // eslint-disable-next-line no-console

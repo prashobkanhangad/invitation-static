@@ -11,5 +11,6 @@ router.get("/", adminUsersController.listUsers);
 router.post("/", adminUsersController.createUser);
 
 router.patch("/:userId", adminUsersController.updateUser);
+router.post("/:userId/reactivate-plan", adminUsersController.reactivateUserPlan);
 
 module.exports = router;

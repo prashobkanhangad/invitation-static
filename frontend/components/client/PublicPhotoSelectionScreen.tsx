@@ -13,6 +13,7 @@ type PublicSelectionTab = {
 
 type PublicSelectionPhoto = {
   id: string;
+  thumbUrl: string | null;
   url: string;
   originalUrl: string | null;
   tabId: string | null;
@@ -463,14 +464,17 @@ export default function PublicPhotoSelectionScreen({
                           <Image
                             src={
                               gridFallbackToOriginalById[photo.id]
-                                ? photo.originalUrl || photo.url || ""
-                                : photo.url || photo.originalUrl || ""
+                                ? photo.url || photo.originalUrl || ""
+                                : photo.thumbUrl ||
+                                  photo.url ||
+                                  photo.originalUrl ||
+                                  ""
                             }
                             alt={photo.label}
                             fill
                             sizes="(max-width: 768px) 50vw, 220px"
                             onError={() => {
-                              if (!photo.originalUrl) return;
+                              if (!photo.url && !photo.originalUrl) return;
                               setGridFallbackToOriginalById((prev) =>
                                 prev[photo.id]
                                   ? prev

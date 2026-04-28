@@ -10,6 +10,7 @@ const ALL_TAB_ID = "__all__";
 
 type SelectionPhoto = {
   id: string;
+  thumbUrl: string | null;
   url: string;
   originalUrl: string | null;
   tabId: string | null;
@@ -27,6 +28,7 @@ type PublicPhotoSelectionPayload = {
     clientTabs?: Array<{ id?: string; label?: string }>;
     photos?: Array<{
       id?: string;
+      thumbUrl?: string;
       url?: string;
       originalUrl?: string;
       tabId?: string | null;
@@ -115,6 +117,10 @@ export default function PublicPhotoSelectionPage() {
       )
         .map((img, idx) => ({
           id: String(img?.id ?? `ps-${idx}`),
+          thumbUrl:
+            typeof img?.thumbUrl === "string" && img.thumbUrl
+              ? img.thumbUrl
+              : null,
           url: String(img?.url ?? ""),
           originalUrl:
             typeof img?.originalUrl === "string" && img.originalUrl
