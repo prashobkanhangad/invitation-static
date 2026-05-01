@@ -208,6 +208,7 @@ export default function ShareAlbumPage() {
         }));
       if (declaredTabs.length > 0) {
         setSelectionTabs(declaredTabs);
+        if (mode === "replace") setSelectionActiveTabId(declaredTabs[0]!.id);
       } else {
         const inferredIncomingTabIds = Array.from(
           new Set(
@@ -228,6 +229,11 @@ export default function ShareAlbumPage() {
             return existing ?? { id, label: `Tab ${idx + 1}` };
           });
         });
+        if (mode === "replace") {
+          const firstInferredTabId =
+            inferredIncomingTabIds.length > 0 ? inferredIncomingTabIds[0] : "";
+          setSelectionActiveTabId(firstInferredTabId || ALL_TAB_ID);
+        }
       }
 
       setSelectionPhotos((prev) => {

@@ -414,18 +414,6 @@ export default function PublicPhotoSelectionScreen({
           ) : (
             <>
               <div className="mb-3 flex gap-2 overflow-x-auto pb-1">
-                <button
-                  type="button"
-                  onClick={() => onTabChange(ALL_TAB_ID)}
-                  className={[
-                    "shrink-0 rounded-full px-4 py-2 text-sm font-semibold transition",
-                    activeTabId === ALL_TAB_ID
-                      ? "bg-stone-900 text-white"
-                      : "bg-white text-stone-700 ring-1 ring-stone-200 hover:bg-stone-50",
-                  ].join(" ")}
-                >
-                  All photos
-                </button>
                 {tabs.map((tab) => (
                   <button
                     key={tab.id}
@@ -441,6 +429,18 @@ export default function PublicPhotoSelectionScreen({
                     {tab.label}
                   </button>
                 ))}
+                <button
+                  type="button"
+                  onClick={() => onTabChange(ALL_TAB_ID)}
+                  className={[
+                    "shrink-0 rounded-full px-4 py-2 text-sm font-semibold transition",
+                    activeTabId === ALL_TAB_ID
+                      ? "bg-stone-900 text-white"
+                      : "bg-white text-stone-700 ring-1 ring-stone-200 hover:bg-stone-50",
+                  ].join(" ")}
+                >
+                  All photos
+                </button>
               </div>
 
               {photosForActiveTab.length === 0 && !hasMorePhotos ? (
