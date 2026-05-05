@@ -208,7 +208,13 @@ export default function ShareAlbumPage() {
         }));
       if (declaredTabs.length > 0) {
         setSelectionTabs(declaredTabs);
-        if (mode === "replace") setSelectionActiveTabId(declaredTabs[0]!.id);
+        if (mode === "replace") {
+          setSelectionActiveTabId((prev) => {
+            if (prev !== ALL_TAB_ID && declaredTabs.some((tab) => tab.id === prev))
+              return prev;
+            return declaredTabs[0]!.id;
+          });
+        }
       } else {
         const inferredIncomingTabIds = Array.from(
           new Set(
@@ -232,7 +238,15 @@ export default function ShareAlbumPage() {
         if (mode === "replace") {
           const firstInferredTabId =
             inferredIncomingTabIds.length > 0 ? inferredIncomingTabIds[0] : "";
-          setSelectionActiveTabId(firstInferredTabId || ALL_TAB_ID);
+          setSelectionActiveTabId((prev) => {
+            if (
+              prev !== ALL_TAB_ID &&
+              inferredIncomingTabIds.includes(String(prev))
+            ) {
+              return prev;
+            }
+            return firstInferredTabId || ALL_TAB_ID;
+          });
         }
       }
 
