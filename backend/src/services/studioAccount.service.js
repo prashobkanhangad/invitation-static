@@ -8,6 +8,12 @@ function serializeUser(user) {
     name: user.name || "",
     studioName: user.studioName || "",
     role: user.role,
+    currentPlanId: user.currentPlanId || "",
+    currentPlanName: user.currentPlanName || "",
+    currentPlanBillingCycle: user.currentPlanBillingCycle || "",
+    currentPlanStartedAt: user.currentPlanStartedAt || null,
+    currentPlanExpiresAt: user.currentPlanExpiresAt || null,
+    currentPlanStatus: user.currentPlanStatus || "none",
   };
 }
 

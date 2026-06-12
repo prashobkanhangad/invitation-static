@@ -13,6 +13,20 @@ const userSchema = new mongoose.Schema(
     },
     studioName: { type: String, default: "" },
     isActive: { type: Boolean, default: true },
+    currentPlanId: { type: String, default: "", trim: true },
+    currentPlanName: { type: String, default: "", trim: true },
+    currentPlanBillingCycle: {
+      type: String,
+      enum: ["monthly", "sixMonth", "yearly", ""],
+      default: "",
+    },
+    currentPlanStartedAt: { type: Date, default: null },
+    currentPlanExpiresAt: { type: Date, default: null },
+    currentPlanStatus: {
+      type: String,
+      enum: ["active", "expired", "cancelled", "none"],
+      default: "none",
+    },
   },
   { timestamps: true }
 );

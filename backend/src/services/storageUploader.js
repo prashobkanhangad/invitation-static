@@ -3,19 +3,29 @@ const path = require("path");
 const multer = require("multer");
 const { randomBytes } = require("crypto");
 const sharp = require("sharp");
-const { S3Client, PutObjectCommand, GetObjectCommand, DeleteObjectCommand } = require("@aws-sdk/client-s3");
+const {
+  S3Client,
+  PutObjectCommand,
+  GetObjectCommand,
+  DeleteObjectCommand,
+  ListObjectsV2Command,
+} = require("@aws-sdk/client-s3");
 const { getSignedUrl } = require("@aws-sdk/s3-request-presigner");
 const { Storage } = require("@google-cloud/storage");
 
 const uploadMemory = multer({
   storage: multer.memoryStorage(),
-  fileFilter: (_req, file, cb) => cb(null, !!(file.mimetype && file.mimetype.startsWith("image/"))),
+  fileFilter: (_req, file, cb) =>
+    cb(null, !!(file.mimetype && file.mimetype.startsWith("image/"))),
   limits: { fileSize: 100 * 1024 * 1024 },
 });
 
 function safeName(originalName = "image.jpg") {
   const ext = path.extname(originalName) || ".jpg";
-  const base = path.basename(originalName, ext).replace(/[^a-z0-9_-]/gi, "").slice(0, 40);
+  const base = path
+    .basename(originalName, ext)
+    .replace(/[^a-z0-9_-]/gi, "")
+    .slice(0, 40);
   return `${base || "image"}_${Date.now()}_${randomBytes(3).toString("hex")}${ext}`.toLowerCase();
 }
 
@@ -46,7 +56,9 @@ function buildGcpBucket() {
       const credentials = JSON.parse(credentialsJsonRaw);
       storage = new Storage({ credentials, projectId: credentials.project_id });
     } catch (_err) {
-      throw new Error("Invalid GCP_CREDENTIALS_JSON: must be valid JSON service account credentials");
+      throw new Error(
+        "Invalid GCP_CREDENTIALS_JSON: must be valid JSON service account credentials",
+      );
     }
   } else if (keyFilenameRaw) {
     const keyPath = path.isAbsolute(keyFilenameRaw)
@@ -66,7 +78,8 @@ function buildGcpBucket() {
 async function uploadToAws({ buffer, contentType, key }) {
   const bucket = process.env.AWS_S3_BUCKET;
   const region = process.env.AWS_REGION;
-  if (!bucket || !region) throw new Error("Missing AWS S3 config (AWS_S3_BUCKET/AWS_REGION)");
+  if (!bucket || !region)
+    throw new Error("Missing AWS S3 config (AWS_S3_BUCKET/AWS_REGION)");
 
   const client = buildAwsClient();
   await client.send(
@@ -75,9 +88,11 @@ async function uploadToAws({ buffer, contentType, key }) {
       Key: key,
       Body: buffer,
       ContentType: contentType || "application/octet-stream",
-    })
+    }),
   );
-  const publicBase = process.env.AWS_S3_PUBLIC_BASE_URL || `https://${bucket}.s3.${region}.amazonaws.com`;
+  const publicBase =
+    process.env.AWS_S3_PUBLIC_BASE_URL ||
+    `https://${bucket}.s3.${region}.amazonaws.com`;
   return `${publicBase.replace(/\/$/, "")}/${key}`;
 }
 
@@ -94,8 +109,46 @@ async function uploadToGcp({ buffer, contentType, key }) {
 }
 
 async function uploadBufferByProvider({ buffer, contentType, key, provider }) {
-  if (provider === "gcp_storage") return uploadToGcp({ buffer, contentType, key });
+  if (provider === "gcp_storage")
+    return uploadToGcp({ buffer, contentType, key });
   return uploadToAws({ buffer, contentType, key });
+}
+
+async function uploadLocalFileByProvider({
+  filePath,
+  contentType,
+  key,
+  provider,
+}) {
+  if (provider === "gcp_storage") {
+    const bucket = buildGcpBucket();
+    await bucket.upload(filePath, {
+      destination: key,
+      contentType: contentType || "application/octet-stream",
+      metadata: { cacheControl: "private, max-age=0, no-store" },
+    });
+    const bucketName = (process.env.GCP_STORAGE_BUCKET || "").trim();
+    const publicBase = `https://storage.googleapis.com/${bucketName}`;
+    return `${publicBase.replace(/\/$/, "")}/${key}`;
+  }
+
+  const bucket = process.env.AWS_S3_BUCKET;
+  const region = process.env.AWS_REGION;
+  if (!bucket || !region)
+    throw new Error("Missing AWS S3 config (AWS_S3_BUCKET/AWS_REGION)");
+  const client = buildAwsClient();
+  await client.send(
+    new PutObjectCommand({
+      Bucket: bucket,
+      Key: key,
+      Body: fs.createReadStream(filePath),
+      ContentType: contentType || "application/octet-stream",
+    }),
+  );
+  const publicBase =
+    process.env.AWS_S3_PUBLIC_BASE_URL ||
+    `https://${bucket}.s3.${region}.amazonaws.com`;
+  return `${publicBase.replace(/\/$/, "")}/${key}`;
 }
 
 /**
@@ -136,7 +189,9 @@ async function downloadObjectBuffer({ key, provider }) {
   const awsBucket = process.env.AWS_S3_BUCKET;
   if (!awsBucket) throw new Error("Missing AWS_S3_BUCKET");
   const client = buildAwsClient();
-  const res = await client.send(new GetObjectCommand({ Bucket: awsBucket, Key: key }));
+  const res = await client.send(
+    new GetObjectCommand({ Bucket: awsBucket, Key: key }),
+  );
   const chunks = [];
   for await (const chunk of res.Body) {
     chunks.push(chunk);
@@ -147,13 +202,58 @@ async function downloadObjectBuffer({ key, provider }) {
 async function deleteObjectAtKey({ key, provider }) {
   if (provider === "gcp_storage") {
     const bucket = buildGcpBucket();
-    await bucket.file(key).delete().catch(() => {});
+    await bucket
+      .file(key)
+      .delete()
+      .catch(() => {});
     return;
   }
   const awsBucket = process.env.AWS_S3_BUCKET;
   if (!awsBucket) throw new Error("Missing AWS_S3_BUCKET");
   const client = buildAwsClient();
   await client.send(new DeleteObjectCommand({ Bucket: awsBucket, Key: key }));
+}
+
+async function calculatePrefixSizeByProvider({ prefix, provider }) {
+  const safePrefix = String(prefix || "").replace(/^\/+/, "");
+  if (!safePrefix) return 0;
+
+  if (provider === "gcp_storage") {
+    const bucket = buildGcpBucket();
+    let total = 0;
+    let pageToken = undefined;
+    do {
+      const [files, nextQuery] = await bucket.getFiles({
+        prefix: safePrefix,
+        autoPaginate: false,
+        maxResults: 1000,
+        pageToken,
+      });
+      for (const file of files) {
+        total += Number(file?.metadata?.size || 0);
+      }
+      pageToken = nextQuery?.pageToken;
+    } while (pageToken);
+    return total;
+  }
+
+  const awsBucket = process.env.AWS_S3_BUCKET;
+  if (!awsBucket) throw new Error("Missing AWS_S3_BUCKET");
+  const client = buildAwsClient();
+  let continuationToken = undefined;
+  let total = 0;
+  do {
+    const res = await client.send(
+      new ListObjectsV2Command({
+        Bucket: awsBucket,
+        Prefix: safePrefix,
+        ContinuationToken: continuationToken,
+      })
+    );
+    for (const item of res.Contents || []) total += Number(item?.Size || 0);
+    continuationToken = res.IsTruncated ? res.NextContinuationToken : undefined;
+  } while (continuationToken);
+  return total;
 }
 
 async function uploadImageByProvider({ req, file, folder, provider }) {
@@ -209,4 +309,6 @@ module.exports = {
   createDirectUploadWriteUrl,
   downloadObjectBuffer,
   deleteObjectAtKey,
+  calculatePrefixSizeByProvider,
+  uploadLocalFileByProvider,
 };

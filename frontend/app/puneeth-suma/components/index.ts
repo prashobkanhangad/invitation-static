@@ -1,0 +1,8 @@
+export { HeroSection } from "./HeroSection";
+export { StorySection } from "./StorySection";
+export { PhotoGallery } from "./PhotoGallery";
+export { EventDetails } from "./EventDetails";
+export { QASection } from "./QASection";
+export { MapSection } from "./MapSection";
+export { InvitationSection } from "./InvitationSection";
+export { FooterSection } from "./FooterSection";

@@ -11,7 +11,9 @@ import {
 import {
   ArrowLeft,
   Check,
+  ChevronDown,
   ChevronRight,
+  Download,
   Eye,
   EyeOff,
   FolderOpen,
@@ -33,12 +35,18 @@ import {
   PrimaryButton,
   StatusBadge,
 } from "@/components/studio-dashboard/blocks";
-import { studioApiFetch } from "@/utils/studioApi";
-import { uploadPhotoSelectionDirect } from "@/utils/studioDirectUpload";
+import { getStudioToken, studioApiFetch } from "@/utils/studioApi";
+import {
+  uploadPhotoSelectionDirect,
+  uploadPhotoSelectionOgImageDirect,
+} from "@/utils/studioDirectUpload";
+import { API_BASE_URL } from "@/utils/api";
 
 const STUDIO_TABLE_SHIMMER =
   "bg-gradient-to-r from-zinc-200 via-zinc-50 to-zinc-200 bg-[length:200%_100%] animate-shimmer";
 const WORKSPACE_PHOTO_PAGE_SIZE = 60;
+const DOWNLOAD_JOB_POLL_MS = 1500;
+const DOWNLOAD_JOB_TIMEOUT_MS = 20 * 60 * 1000;
 
 type SelectionRoundBadge = { label: string; tone: "good" | "warn" | "neutral" };
 
@@ -49,6 +57,7 @@ type SelectionPhoto = {
   /** When client tabs exist, groups the photo in that section (`null` = only under “All” in client preview). */
   tabId: string | null;
   blobUrl?: string;
+  originalUrl?: string | null;
   /** Full original filename for client downloads (uploads only). */
   fileName?: string;
   mimeType?: string;
@@ -131,6 +140,26 @@ export default function StudioPhotoSelectionSection() {
   const [bulkDeleteMode, setBulkDeleteMode] = useState(false);
   const [markedPhotoIds, setMarkedPhotoIds] = useState<string[]>([]);
   const [bulkDeletingPhotos, setBulkDeletingPhotos] = useState(false);
+  const [pendingUnselectPhoto, setPendingUnselectPhoto] = useState<{
+    id: string;
+    label: string;
+  } | null>(null);
+  const [unselectConfirmBusy, setUnselectConfirmBusy] = useState(false);
+  const [previewDownloadMenuOpen, setPreviewDownloadMenuOpen] = useState(false);
+  const [previewDownloadBusy, setPreviewDownloadBusy] = useState<
+    "original" | "optimized" | null
+  >(null);
+  const [selectedDownloadMenuOpen, setSelectedDownloadMenuOpen] =
+    useState(false);
+  const [selectedDownloadBusy, setSelectedDownloadBusy] = useState<
+    "original" | "optimized" | null
+  >(null);
+  const [selectedDownloadProgress, setSelectedDownloadProgress] = useState<{
+    status: "queued" | "processing" | "completed" | "failed";
+    total: number;
+    done: number;
+    message: string;
+  } | null>(null);
   const [workspaceVisiblePhotoCount, setWorkspaceVisiblePhotoCount] = useState(
     WORKSPACE_PHOTO_PAGE_SIZE,
   );
@@ -150,6 +179,10 @@ export default function StudioPhotoSelectionSection() {
             | string
             | null,
           blobUrl: String(ph.url || ""),
+          originalUrl:
+            typeof ph.originalUrl === "string" && ph.originalUrl
+              ? ph.originalUrl
+              : null,
           label: String(ph.originalName || ph.id || `IMG #${idx + 1}`),
           fileName: String(ph.originalName || ""),
           mimeType: String(ph.mimeType || ""),
@@ -312,6 +345,11 @@ export default function StudioPhotoSelectionSection() {
     }
     setBulkDeleteMode(false);
     setMarkedPhotoIds([]);
+    setPendingUnselectPhoto(null);
+    setUnselectConfirmBusy(false);
+    setSelectedDownloadMenuOpen(false);
+    setSelectedDownloadBusy(null);
+    setSelectedDownloadProgress(null);
     setWorkspaceVisiblePhotoCount(WORKSPACE_PHOTO_PAGE_SIZE);
   }, [activeProjectId]);
 
@@ -363,7 +401,15 @@ export default function StudioPhotoSelectionSection() {
     };
   }, [studioImagePreviewId]);
 
-  const togglePick = (photoId: string) => {
+  useEffect(() => {
+    if (!studioImagePreviewId) setPreviewDownloadMenuOpen(false);
+  }, [studioImagePreviewId]);
+
+  useEffect(() => {
+    if (!activeProject || pickedCount <= 0) setSelectedDownloadMenuOpen(false);
+  }, [activeProject, pickedCount]);
+
+  const setPhotoPicked = (photoId: string, nextPicked: boolean) => {
     if (!activeProjectId) return;
     setProjects((prev) =>
       prev.map((p) =>
@@ -372,7 +418,7 @@ export default function StudioPhotoSelectionSection() {
           : {
               ...p,
               photos: p.photos.map((ph) =>
-                ph.id === photoId ? { ...ph, picked: !ph.picked } : ph,
+                ph.id === photoId ? { ...ph, picked: nextPicked } : ph,
               ),
             },
       ),
@@ -382,13 +428,35 @@ export default function StudioPhotoSelectionSection() {
       {
         method: "PATCH",
         body: {
-          picked: !(
-            activeProject?.photos.find((ph) => ph.id === photoId)?.picked ??
-            false
-          ),
+          picked: nextPicked,
         },
       },
     ).catch(() => {});
+  };
+
+  const togglePick = (photoId: string) => {
+    if (!activeProjectId) return;
+    const photo = activeProject?.photos.find((ph) => ph.id === photoId);
+    const currentlyPicked = Boolean(photo?.picked);
+    if (!currentlyPicked) {
+      setPhotoPicked(photoId, true);
+      return;
+    }
+    setPendingUnselectPhoto({
+      id: photoId,
+      label: photo?.label || "this photo",
+    });
+  };
+
+  const confirmUnselectPhoto = async () => {
+    if (!pendingUnselectPhoto || unselectConfirmBusy) return;
+    setUnselectConfirmBusy(true);
+    try {
+      setPhotoPicked(pendingUnselectPhoto.id, false);
+      setPendingUnselectPhoto(null);
+    } finally {
+      setUnselectConfirmBusy(false);
+    }
   };
 
   const toggleFav = (photoId: string) => {
@@ -535,15 +603,11 @@ export default function StudioPhotoSelectionSection() {
     setOgImageUploadError(null);
     setOgImageUploading(true);
     try {
-      const formData = new FormData();
-      formData.append("image", file);
-      const resp = await studioApiFetch<{ ogImage?: any; project?: any }>(
-        `/api/studio/photo-selection/projects/${encodeURIComponent(activeProjectId)}/og-image`,
-        {
-          method: "POST",
-          formData,
-        },
-      );
+      const resp = await uploadPhotoSelectionOgImageDirect({
+        projectId: activeProjectId,
+        file,
+        api: studioApiFetch,
+      });
       const mapped = resp?.project ? mapApiProjectToUi(resp.project) : null;
       setProjects((prev) =>
         prev.map((p) => {
@@ -781,6 +845,7 @@ export default function StudioPhotoSelectionSection() {
           fav: false,
           tabId,
           blobUrl: URL.createObjectURL(file),
+          originalUrl: null,
           label:
             file.name.length > 22 ? `${file.name.slice(0, 20)}…` : file.name,
           fileName: file.name,
@@ -816,6 +881,10 @@ export default function StudioPhotoSelectionSection() {
             | string
             | null,
           blobUrl: String(ph.url || ""),
+          originalUrl:
+            typeof ph.originalUrl === "string" && ph.originalUrl
+              ? ph.originalUrl
+              : null,
           label: String(ph.originalName || ph.id || `IMG #${idx + 1}`),
           fileName: String(ph.originalName || ""),
           mimeType: String(ph.mimeType || ""),
@@ -997,6 +1066,124 @@ export default function StudioPhotoSelectionSection() {
       }, 1800);
     } catch {
       window.alert("Unable to copy link. Please allow clipboard access.");
+    }
+  };
+
+  const downloadStudioPhoto = async (
+    projectId: string,
+    photoId: string,
+    variant: "original" | "optimized",
+  ) => {
+    setPreviewDownloadBusy(variant);
+    setPreviewDownloadMenuOpen(false);
+    try {
+      const token = getStudioToken();
+      if (!token) throw new Error("Missing studio token");
+      const path = `/api/studio/photo-selection/projects/${encodeURIComponent(projectId)}/photos/${encodeURIComponent(photoId)}/download?variant=${variant}`;
+      const url = `${API_BASE_URL}${path.startsWith("/") ? "" : "/"}${path}`;
+      const res = await fetch(url, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) {
+        const text = await res.text();
+        let msg = "Download failed";
+        try {
+          const parsed = JSON.parse(text) as { message?: string };
+          if (parsed?.message) msg = parsed.message;
+        } catch {
+          /* ignore */
+        }
+        throw new Error(msg);
+      }
+      const blob = await res.blob();
+      const objectUrl = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = objectUrl;
+      a.download = "";
+      a.rel = "noopener noreferrer";
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      window.setTimeout(() => URL.revokeObjectURL(objectUrl), 60_000);
+    } catch (e) {
+      window.alert(e instanceof Error ? e.message : "Download failed");
+    } finally {
+      setPreviewDownloadBusy(null);
+    }
+  };
+
+  const downloadSelectedStudioPhotos = async (
+    projectId: string,
+    variant: "original" | "optimized",
+  ) => {
+    setSelectedDownloadBusy(variant);
+    setSelectedDownloadMenuOpen(false);
+    setSelectedDownloadProgress({
+      status: "queued",
+      total: 0,
+      done: 0,
+      message: "Queued",
+    });
+    try {
+      const start = await studioApiFetch<{ jobId?: string }>(
+        `/api/studio/photo-selection/projects/${encodeURIComponent(projectId)}/photos/download-selected?variant=${variant}`,
+        { method: "POST" },
+      );
+      const jobId =
+        typeof start?.jobId === "string" && start.jobId ? start.jobId : "";
+      if (!jobId) throw new Error("Could not start download job");
+
+      const startedAt = Date.now();
+      let downloadUrl = "";
+      while (Date.now() - startedAt < DOWNLOAD_JOB_TIMEOUT_MS) {
+        const status = await studioApiFetch<{
+          job?: {
+            status?: "queued" | "processing" | "completed" | "failed";
+            progress?: { total?: number; done?: number; message?: string };
+            result?: { downloadUrl?: string };
+            errorMessage?: string;
+          };
+        }>(`/api/studio/upload-jobs/${encodeURIComponent(jobId)}`);
+        setSelectedDownloadProgress({
+          status: status.job?.status || "processing",
+          total: Number(status.job?.progress?.total ?? 0),
+          done: Number(status.job?.progress?.done ?? 0),
+          message: String(status.job?.progress?.message ?? ""),
+        });
+        if (status.job?.status === "completed") {
+          downloadUrl = String(status.job?.result?.downloadUrl || "");
+          break;
+        }
+        if (status.job?.status === "failed") {
+          throw new Error(status.job.errorMessage || "Download job failed");
+        }
+        await new Promise((resolve) =>
+          window.setTimeout(resolve, DOWNLOAD_JOB_POLL_MS),
+        );
+      }
+      if (!downloadUrl) {
+        throw new Error("Download is taking too long. Please try again.");
+      }
+
+      const a = document.createElement("a");
+      a.href = downloadUrl;
+      a.download = "";
+      a.rel = "noopener noreferrer";
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setSelectedDownloadProgress((prev) =>
+        prev
+          ? { ...prev, status: "completed", message: "Download started" }
+          : prev,
+      );
+    } catch (e) {
+      setSelectedDownloadProgress((prev) =>
+        prev ? { ...prev, status: "failed", message: "Failed" } : prev,
+      );
+      window.alert(e instanceof Error ? e.message : "Download failed");
+    } finally {
+      setSelectedDownloadBusy(null);
     }
   };
 
@@ -1384,6 +1571,12 @@ export default function StudioPhotoSelectionSection() {
               <h1 className="mt-1 text-2xl font-semibold tracking-tight text-zinc-900 sm:text-3xl">
                 {p.name}
               </h1>
+              <p className="mt-1 text-xs font-semibold uppercase tracking-wide text-zinc-500">
+                Images: {filteredWorkspacePhotos.length}
+                {filteredWorkspacePhotos.length !== p.photos.length
+                  ? ` / ${p.photos.length}`
+                  : ""}
+              </p>
               {p.subtitle.trim() ? (
                 <p className="mt-2 max-w-2xl text-sm leading-relaxed text-zinc-600">
                   {p.subtitle}
@@ -1668,20 +1861,13 @@ export default function StudioPhotoSelectionSection() {
           </aside>
 
           <section className="min-w-0 space-y-4 xl:order-1">
-            <div className="flex flex-col gap-3 rounded-2xl border border-zinc-200/80 bg-white p-4 shadow-sm lg:flex-row lg:items-center lg:justify-between">
-              <div className="flex flex-wrap items-center gap-2">
-                <span className="inline-flex h-10 items-center rounded-xl border border-zinc-200 bg-zinc-50 px-3 text-xs font-semibold text-zinc-700">
-                  Images: {filteredWorkspacePhotos.length}
-                  {filteredWorkspacePhotos.length !== p.photos.length
-                    ? ` / ${p.photos.length}`
-                    : ""}
-                </span>
-                <label className="inline-flex h-10 items-center gap-2 rounded-xl border border-zinc-200 bg-white px-3 text-xs font-semibold text-zinc-700">
-                  <span>Tab</span>
+            <div className="flex flex-wrap items-center gap-2 rounded-2xl border border-zinc-200/80 bg-white p-4 shadow-sm">
+              <div className="grid w-full grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6">
+                <label className="inline-flex h-10 w-full items-center justify-center gap-2 rounded-xl border border-zinc-200 bg-white px-3 text-xs font-semibold text-zinc-700">
                   <select
                     value={studioFilterTabId}
                     onChange={(e) => setStudioFilterTabId(e.target.value)}
-                    className="bg-transparent text-xs font-semibold text-zinc-900 outline-none"
+                    className="w-full bg-transparent text-xs font-semibold text-zinc-900 outline-none"
                   >
                     <option value="__all__">All tabs</option>
                     <option value="__unassigned__">Unassigned</option>
@@ -1696,7 +1882,7 @@ export default function StudioPhotoSelectionSection() {
                   type="button"
                   onClick={() => setStudioFilterSelectedOnly((v) => !v)}
                   className={[
-                    "inline-flex items-center gap-2 rounded-xl border px-3 py-2 text-xs font-semibold transition",
+                    "inline-flex h-10 w-full items-center justify-center gap-2 rounded-xl border px-3 text-xs font-semibold transition",
                     studioFilterSelectedOnly
                       ? "border-zinc-900 bg-zinc-900 text-white"
                       : "border-zinc-200 bg-white text-zinc-700 hover:bg-zinc-50",
@@ -1709,7 +1895,7 @@ export default function StudioPhotoSelectionSection() {
                   type="button"
                   onClick={() => setStudioFilterFavouriteOnly((v) => !v)}
                   className={[
-                    "inline-flex items-center gap-2 rounded-xl border px-3 py-2 text-xs font-semibold transition",
+                    "inline-flex h-10 w-full items-center justify-center gap-2 rounded-xl border px-3 text-xs font-semibold transition",
                     studioFilterFavouriteOnly
                       ? "border-rose-600 bg-rose-600 text-white"
                       : "border-zinc-200 bg-white text-zinc-700 hover:bg-zinc-50",
@@ -1734,14 +1920,11 @@ export default function StudioPhotoSelectionSection() {
                       setStudioFilterFavouriteOnly(false);
                       setStudioFilterTabId("__all__");
                     }}
-                    className="text-xs font-semibold text-zinc-600 underline-offset-2 hover:text-zinc-900 hover:underline"
+                    className="inline-flex h-10 w-full items-center justify-center rounded-xl border border-zinc-200 bg-white px-3 text-xs font-semibold text-zinc-700 hover:bg-zinc-50"
                   >
                     Clear filters
                   </button>
                 ) : null}
-              </div>
-
-              <div className="flex flex-wrap items-center gap-2">
                 {bulkDeleteMode ? (
                   <>
                     <button
@@ -1751,7 +1934,7 @@ export default function StudioPhotoSelectionSection() {
                         displayedWorkspacePhotos.length === 0 ||
                         bulkDeletingPhotos
                       }
-                      className="inline-flex h-10 items-center justify-center gap-2 rounded-xl border border-zinc-200 bg-white px-4 text-sm font-semibold text-zinc-900 shadow-sm hover:bg-zinc-50 disabled:cursor-not-allowed disabled:opacity-50"
+                      className="inline-flex h-10 w-full items-center justify-center gap-2 rounded-xl border border-zinc-200 bg-white px-3 text-xs font-semibold text-zinc-900 hover:bg-zinc-50 disabled:cursor-not-allowed disabled:opacity-50"
                     >
                       Mark shown
                     </button>
@@ -1761,7 +1944,7 @@ export default function StudioPhotoSelectionSection() {
                       disabled={
                         markedPhotoIds.length === 0 || bulkDeletingPhotos
                       }
-                      className="inline-flex h-10 items-center justify-center gap-2 rounded-xl border border-zinc-200 bg-white px-4 text-sm font-semibold text-zinc-900 shadow-sm hover:bg-zinc-50 disabled:cursor-not-allowed disabled:opacity-50"
+                      className="inline-flex h-10 w-full items-center justify-center gap-2 rounded-xl border border-zinc-200 bg-white px-3 text-xs font-semibold text-zinc-900 hover:bg-zinc-50 disabled:cursor-not-allowed disabled:opacity-50"
                     >
                       Clear marks
                     </button>
@@ -1771,7 +1954,7 @@ export default function StudioPhotoSelectionSection() {
                       disabled={
                         markedPhotoIds.length === 0 || bulkDeletingPhotos
                       }
-                      className="inline-flex h-10 items-center justify-center gap-2 rounded-xl border border-rose-200 bg-rose-50 px-4 text-sm font-semibold text-rose-800 shadow-sm hover:bg-rose-100 disabled:cursor-not-allowed disabled:opacity-50"
+                      className="inline-flex h-10 w-full items-center justify-center gap-2 rounded-xl border border-rose-200 bg-rose-50 px-3 text-xs font-semibold text-rose-800 hover:bg-rose-100 disabled:cursor-not-allowed disabled:opacity-50"
                     >
                       <Trash2 className="h-4 w-4" strokeWidth={1.75} />
                       {bulkDeletingPhotos
@@ -1788,7 +1971,7 @@ export default function StudioPhotoSelectionSection() {
                   }}
                   disabled={bulkDeletingPhotos}
                   className={[
-                    "inline-flex h-10 items-center justify-center gap-2 rounded-xl border px-4 text-sm font-semibold shadow-sm transition",
+                    "inline-flex h-10 w-full items-center justify-center gap-2 rounded-xl border px-3 text-xs font-semibold transition",
                     bulkDeleteMode
                       ? "border-zinc-900 bg-zinc-900 text-white hover:bg-zinc-800"
                       : "border-zinc-200 bg-white text-zinc-900 hover:bg-zinc-50",
@@ -1799,11 +1982,65 @@ export default function StudioPhotoSelectionSection() {
                 <button
                   type="button"
                   onClick={openUploadModal}
-                  className="inline-flex h-10 items-center justify-center gap-2 rounded-xl border border-zinc-200 bg-white px-4 text-sm font-semibold text-zinc-900 shadow-sm hover:bg-zinc-50"
+                  className="inline-flex h-10 w-full items-center justify-center gap-2 rounded-xl border border-zinc-200 bg-white px-3 text-xs font-semibold text-zinc-900 hover:bg-zinc-50"
                 >
                   <ImagePlus className="h-4 w-4" strokeWidth={1.75} />
                   Add photos
                 </button>
+                <div className="relative w-full">
+                  <button
+                    type="button"
+                    disabled={
+                      pickedCount === 0 || selectedDownloadBusy !== null
+                    }
+                    onClick={() => setSelectedDownloadMenuOpen((open) => !open)}
+                    className={[
+                      "inline-flex h-10 w-full items-center justify-center gap-2 rounded-xl border px-3 text-xs font-semibold transition",
+                      pickedCount > 0
+                        ? "border-zinc-200 bg-white text-zinc-900 hover:bg-zinc-50"
+                        : "cursor-not-allowed border-zinc-100 bg-zinc-50 text-zinc-400",
+                    ].join(" ")}
+                    title={
+                      pickedCount > 0
+                        ? "Download all selected photos"
+                        : "Select photos first"
+                    }
+                  >
+                    <Download className="h-4 w-4" strokeWidth={1.75} />
+                    {selectedDownloadBusy
+                      ? "Preparing..."
+                      : `Download selected (${pickedCount})`}
+                    <ChevronDown
+                      className={[
+                        "h-4 w-4 transition",
+                        selectedDownloadMenuOpen ? "rotate-180" : "",
+                      ].join(" ")}
+                      strokeWidth={2}
+                    />
+                  </button>
+                  {selectedDownloadMenuOpen && pickedCount > 0 ? (
+                    <div className="absolute right-0 top-full z-20 mt-2 w-52 rounded-xl border border-zinc-200 bg-white p-1.5 shadow-xl">
+                      <button
+                        type="button"
+                        onClick={() =>
+                          void downloadSelectedStudioPhotos(p.id, "original")
+                        }
+                        className="flex w-full rounded-lg px-3 py-2 text-left text-sm font-semibold text-zinc-900 hover:bg-zinc-100"
+                      >
+                        Original
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          void downloadSelectedStudioPhotos(p.id, "optimized")
+                        }
+                        className="mt-1 flex w-full rounded-lg px-3 py-2 text-left text-sm font-semibold text-zinc-900 hover:bg-zinc-100"
+                      >
+                        Optimized
+                      </button>
+                    </div>
+                  ) : null}
+                </div>
                 <button
                   type="button"
                   onClick={() => void copyClientLink(p)}
@@ -1814,7 +2051,7 @@ export default function StudioPhotoSelectionSection() {
                       : "Publish the selection to copy a link"
                   }
                   className={[
-                    "inline-flex h-10 items-center justify-center gap-2 rounded-xl border px-4 text-sm font-semibold shadow-sm transition",
+                    "inline-flex h-10 w-full items-center justify-center gap-2 rounded-xl border px-3 text-xs font-semibold transition",
                     p.published
                       ? "border-zinc-200 bg-white text-zinc-900 hover:bg-zinc-50"
                       : "cursor-not-allowed border-zinc-100 bg-zinc-50 text-zinc-400",
@@ -1824,6 +2061,42 @@ export default function StudioPhotoSelectionSection() {
                   {copiedProjectId === p.id ? "Copied" : "Copy URL"}
                 </button>
               </div>
+              {selectedDownloadProgress &&
+              (selectedDownloadBusy ||
+                selectedDownloadProgress.status === "processing") ? (
+                <div className="w-full rounded-xl border border-zinc-200 bg-zinc-50 px-3 py-2">
+                  <p className="text-xs font-semibold text-zinc-700">
+                    {selectedDownloadProgress.message ||
+                      "Preparing download..."}
+                  </p>
+                  <div className="mt-1.5 h-1.5 w-full overflow-hidden rounded-full bg-zinc-200">
+                    <div
+                      className="h-full rounded-full bg-zinc-900 transition-[width] duration-200"
+                      style={{
+                        width:
+                          selectedDownloadProgress.total > 0
+                            ? `${Math.min(
+                                100,
+                                Math.max(
+                                  0,
+                                  Math.round(
+                                    (selectedDownloadProgress.done /
+                                      selectedDownloadProgress.total) *
+                                      100,
+                                  ),
+                                ),
+                              )}%`
+                            : "8%",
+                      }}
+                    />
+                  </div>
+                  <p className="mt-1 text-[11px] text-zinc-600">
+                    Status: {selectedDownloadProgress.status} ·{" "}
+                    {selectedDownloadProgress.done}/
+                    {selectedDownloadProgress.total || "?"}
+                  </p>
+                </div>
+              ) : null}
             </div>
 
             <div className="rounded-2xl border border-zinc-200/80 bg-white p-4 shadow-sm">
@@ -1869,7 +2142,7 @@ export default function StudioPhotoSelectionSection() {
                   </button>
                 </div>
               ) : (
-                <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 md:grid-cols-6">
+                <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 md:grid-cols-6">
                   {displayedWorkspacePhotos.map((t) => (
                     <div key={t.id} className="relative aspect-square w-full">
                       {bulkDeleteMode && markedPhotoIdSet.has(t.id) ? (
@@ -2056,6 +2329,54 @@ export default function StudioPhotoSelectionSection() {
                     ? "Remove favourite"
                     : "Mark favourite"}
                 </button>
+                <div className="relative">
+                  <button
+                    type="button"
+                    disabled={previewDownloadBusy !== null}
+                    onClick={() => setPreviewDownloadMenuOpen((open) => !open)}
+                    className="inline-flex h-10 items-center gap-2 rounded-xl border border-white/25 bg-white/10 px-4 text-sm font-semibold text-white hover:bg-white/20 disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    <Download className="h-4 w-4" strokeWidth={2} />
+                    {previewDownloadBusy ? "Preparing..." : "Download"}
+                    <ChevronDown
+                      className={[
+                        "h-4 w-4 transition",
+                        previewDownloadMenuOpen ? "rotate-180" : "",
+                      ].join(" ")}
+                      strokeWidth={2}
+                    />
+                  </button>
+                  {previewDownloadMenuOpen ? (
+                    <div className="absolute left-0 top-full z-20 mt-2 w-52 rounded-xl border border-white/20 bg-black/90 p-1.5 shadow-xl backdrop-blur">
+                      <button
+                        type="button"
+                        onClick={() =>
+                          void downloadStudioPhoto(
+                            p.id,
+                            studioPreviewPhoto.id,
+                            "original",
+                          )
+                        }
+                        className="flex w-full rounded-lg px-3 py-2 text-left text-sm font-semibold text-white hover:bg-white/10"
+                      >
+                        Original
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          void downloadStudioPhoto(
+                            p.id,
+                            studioPreviewPhoto.id,
+                            "optimized",
+                          )
+                        }
+                        className="mt-1 flex w-full rounded-lg px-3 py-2 text-left text-sm font-semibold text-white hover:bg-white/10"
+                      >
+                        Optimized
+                      </button>
+                    </div>
+                  ) : null}
+                </div>
                 <button
                   type="button"
                   onClick={() =>
@@ -2076,6 +2397,54 @@ export default function StudioPhotoSelectionSection() {
               <p className="text-center text-xs text-white/60">
                 Escape or backdrop to close
               </p>
+            </div>
+          </div>
+        ) : null}
+        {pendingUnselectPhoto ? (
+          <div className="fixed inset-0 z-[72] flex items-end justify-center sm:items-center sm:p-4">
+            <button
+              type="button"
+              aria-label="Close"
+              className="absolute inset-0 bg-black/45"
+              onClick={() => {
+                if (unselectConfirmBusy) return;
+                setPendingUnselectPhoto(null);
+              }}
+            />
+            <div
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="unselect-photo-title"
+              className="relative w-full max-w-md rounded-t-3xl border border-zinc-200 bg-white p-5 shadow-2xl sm:rounded-3xl"
+            >
+              <p
+                id="unselect-photo-title"
+                className="text-base font-semibold text-zinc-900"
+              >
+                Remove from selected?
+              </p>
+              <p className="mt-2 text-sm text-zinc-600">
+                <span className="font-medium text-zinc-800">
+                  {pendingUnselectPhoto.label}
+                </span>{" "}
+                will be unselected.
+              </p>
+              <div className="mt-5 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+                <GhostButton
+                  type="button"
+                  onClick={() => setPendingUnselectPhoto(null)}
+                  disabled={unselectConfirmBusy}
+                >
+                  Cancel
+                </GhostButton>
+                <PrimaryButton
+                  type="button"
+                  onClick={() => void confirmUnselectPhoto()}
+                  disabled={unselectConfirmBusy}
+                >
+                  {unselectConfirmBusy ? "Removing..." : "Yes, unselect"}
+                </PrimaryButton>
+              </div>
             </div>
           </div>
         ) : null}

@@ -14,10 +14,40 @@ type AdminUser = {
   studioName?: string;
   isActive?: boolean;
   createdAt?: string;
+  currentPlanId?: string;
+  currentPlanName?: string;
+  currentPlanBillingCycle?: "monthly" | "sixMonth" | "yearly" | "";
+  currentPlanStartedAt?: string | null;
+  currentPlanExpiresAt?: string | null;
+  currentPlanStatus?: "active" | "expired" | "cancelled" | "none";
+  usage?: {
+    totalBytes?: number;
+    albumsBytes?: number;
+    photoSelectionBytes?: number;
+  } | null;
+};
+
+type StudioPlan = {
+  id: string;
+  name: string;
+  active?: boolean;
 };
 
 function userRowId(u: AdminUser): string {
   return String(u._id ?? u.id ?? "");
+}
+
+function formatBytes(bytes: number): string {
+  if (!Number.isFinite(bytes) || bytes <= 0) return "0 B";
+  const units = ["B", "KB", "MB", "GB", "TB"];
+  let value = bytes;
+  let unitIndex = 0;
+  while (value >= 1024 && unitIndex < units.length - 1) {
+    value /= 1024;
+    unitIndex += 1;
+  }
+  const decimals = value >= 100 ? 0 : value >= 10 ? 1 : 2;
+  return `${value.toFixed(decimals)} ${units[unitIndex]}`;
 }
 
 export default function StudioUsersPage() {
@@ -25,6 +55,7 @@ export default function StudioUsersPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [users, setUsers] = useState<AdminUser[]>([]);
+  const [plans, setPlans] = useState<StudioPlan[]>([]);
 
   const [createOpen, setCreateOpen] = useState(false);
   const [createBusy, setCreateBusy] = useState(false);
@@ -46,10 +77,20 @@ export default function StudioUsersPage() {
   const [editIsActive, setEditIsActive] = useState(true);
   const [editPassword, setEditPassword] = useState("");
   const [editPasswordConfirm, setEditPasswordConfirm] = useState("");
+  const [editPlanId, setEditPlanId] = useState("");
+  const [editPlanBillingCycle, setEditPlanBillingCycle] = useState<"monthly" | "sixMonth" | "yearly">("monthly");
+  const [editPlanStartedAt, setEditPlanStartedAt] = useState("");
+  const [editPlanExpiresAt, setEditPlanExpiresAt] = useState("");
+  const [editPlanStatus, setEditPlanStatus] = useState<"active" | "expired" | "cancelled" | "none">("none");
 
   const loadUsers = useCallback(async () => {
     const data = await studioApiFetch<{ users: AdminUser[] }>("/api/admin/users");
     setUsers(data.users || []);
+  }, []);
+
+  const loadPlans = useCallback(async () => {
+    const data = await studioApiFetch<{ plans: StudioPlan[] }>("/api/studio/plans");
+    setPlans((data.plans || []).filter((p) => p.active !== false));
   }, []);
 
   useEffect(() => {
@@ -64,7 +105,7 @@ export default function StudioUsersPage() {
           setLoading(false);
           return;
         }
-        await loadUsers();
+        await Promise.all([loadUsers(), loadPlans()]);
       } catch (e) {
         if (cancelled) return;
         setError(e instanceof Error ? e.message : "Failed to load users");
@@ -76,7 +117,7 @@ export default function StudioUsersPage() {
     return () => {
       cancelled = true;
     };
-  }, [loadUsers]);
+  }, [loadPlans, loadUsers]);
 
   const resetCreateForm = () => {
     setCreateFormError(null);
@@ -143,6 +184,15 @@ export default function StudioUsersPage() {
     setEditIsActive(u.isActive !== false);
     setEditPassword("");
     setEditPasswordConfirm("");
+    setEditPlanId(u.currentPlanId ?? "");
+    setEditPlanBillingCycle((u.currentPlanBillingCycle || "monthly") as "monthly" | "sixMonth" | "yearly");
+    setEditPlanStartedAt(
+      u.currentPlanStartedAt ? new Date(u.currentPlanStartedAt).toISOString().slice(0, 10) : ""
+    );
+    setEditPlanExpiresAt(
+      u.currentPlanExpiresAt ? new Date(u.currentPlanExpiresAt).toISOString().slice(0, 10) : ""
+    );
+    setEditPlanStatus((u.currentPlanStatus || "none") as "active" | "expired" | "cancelled" | "none");
     setEditOpen(true);
   };
 
@@ -153,6 +203,11 @@ export default function StudioUsersPage() {
     setEditFormError(null);
     setEditPassword("");
     setEditPasswordConfirm("");
+    setEditPlanId("");
+    setEditPlanBillingCycle("monthly");
+    setEditPlanStartedAt("");
+    setEditPlanExpiresAt("");
+    setEditPlanStatus("none");
   };
 
   const submitEdit = async () => {
@@ -178,6 +233,11 @@ export default function StudioUsersPage() {
         studioName: editStudioName.trim(),
         role: editRole,
         isActive: editIsActive,
+        currentPlanId: editPlanId,
+        currentPlanBillingCycle: editPlanBillingCycle,
+        currentPlanStartedAt: editPlanStartedAt || null,
+        currentPlanExpiresAt: editPlanExpiresAt || null,
+        currentPlanStatus: editPlanStatus,
       };
       if (wantsPassword) body.password = pw;
       await studioApiFetch<{ user: AdminUser }>(
@@ -194,6 +254,42 @@ export default function StudioUsersPage() {
       setEditPasswordConfirm("");
     } catch (e) {
       setEditFormError(e instanceof Error ? e.message : "Could not update user");
+    } finally {
+      setEditBusy(false);
+    }
+  };
+
+  const reactivatePlan = async () => {
+    if (!editUserId || !editPlanId) {
+      setEditFormError("Select a plan before reactivating.");
+      return;
+    }
+    setEditBusy(true);
+    setEditFormError(null);
+    try {
+      const result = await studioApiFetch<{ user: AdminUser }>(
+        `/api/admin/users/${encodeURIComponent(editUserId)}/reactivate-plan`,
+        {
+          method: "POST",
+          body: {
+            planId: editPlanId,
+            billingCycle: editPlanBillingCycle,
+          },
+        }
+      );
+      await loadUsers();
+      const updated = result?.user;
+      if (updated) {
+        setEditPlanStatus((updated.currentPlanStatus || "active") as "active" | "expired" | "cancelled" | "none");
+        setEditPlanStartedAt(
+          updated.currentPlanStartedAt ? new Date(updated.currentPlanStartedAt).toISOString().slice(0, 10) : ""
+        );
+        setEditPlanExpiresAt(
+          updated.currentPlanExpiresAt ? new Date(updated.currentPlanExpiresAt).toISOString().slice(0, 10) : ""
+        );
+      }
+    } catch (e) {
+      setEditFormError(e instanceof Error ? e.message : "Could not reactivate plan");
     } finally {
       setEditBusy(false);
     }
@@ -250,6 +346,9 @@ export default function StudioUsersPage() {
                   <th className="px-5 py-3">Role</th>
                   <th className="px-5 py-3">Studio</th>
                   <th className="px-5 py-3">Status</th>
+                  <th className="px-5 py-3">Current plan</th>
+                  <th className="px-5 py-3">Plan expiry</th>
+                  <th className="px-5 py-3">Usage</th>
                   <th className="px-5 py-3">Created</th>
                   <th className="px-5 py-3 text-right">Actions</th>
                 </tr>
@@ -265,6 +364,22 @@ export default function StudioUsersPage() {
                       <StatusBadge tone={u.isActive === false ? "warn" : "good"}>
                         {u.isActive === false ? "Inactive" : "Active"}
                       </StatusBadge>
+                    </td>
+                    <td className="px-5 py-3 text-zinc-700">
+                      {u.currentPlanName || "—"}
+                      {u.currentPlanStatus && u.currentPlanStatus !== "none" ? (
+                        <span className="ml-2 text-xs text-zinc-500">({u.currentPlanStatus})</span>
+                      ) : null}
+                    </td>
+                    <td className="px-5 py-3 text-zinc-600">
+                      {u.currentPlanExpiresAt
+                        ? new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", year: "numeric" }).format(
+                            new Date(u.currentPlanExpiresAt)
+                          )
+                        : "—"}
+                    </td>
+                    <td className="px-5 py-3 text-zinc-600">
+                      {formatBytes(Number(u.usage?.totalBytes || 0))}
                     </td>
                     <td className="px-5 py-3 text-zinc-600">
                       {u.createdAt
@@ -470,6 +585,111 @@ export default function StudioUsersPage() {
                     placeholder="Repeat new password"
                     className="mt-2 h-11 w-full rounded-xl border border-zinc-200 bg-white px-3 text-sm text-zinc-900 outline-none ring-zinc-900/10 focus:ring-4 placeholder:text-zinc-400"
                   />
+                </div>
+                <div>
+                  <label htmlFor="edit-user-plan" className="text-sm font-semibold text-zinc-900">
+                    Current plan
+                  </label>
+                  <select
+                    id="edit-user-plan"
+                    value={editPlanId}
+                    onChange={(e) => setEditPlanId(e.target.value)}
+                    className="mt-2 h-11 w-full rounded-xl border border-zinc-200 bg-white px-3 text-sm text-zinc-900 outline-none ring-zinc-900/10 focus:ring-4"
+                  >
+                    <option value="">No plan</option>
+                    {plans.map((plan) => (
+                      <option key={plan.id} value={plan.id}>
+                        {plan.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label htmlFor="edit-user-plan-cycle" className="text-sm font-semibold text-zinc-900">
+                    Billing cycle
+                  </label>
+                  <select
+                    id="edit-user-plan-cycle"
+                    value={editPlanBillingCycle}
+                    onChange={(e) => setEditPlanBillingCycle(e.target.value as "monthly" | "sixMonth" | "yearly")}
+                    className="mt-2 h-11 w-full rounded-xl border border-zinc-200 bg-white px-3 text-sm text-zinc-900 outline-none ring-zinc-900/10 focus:ring-4"
+                  >
+                    <option value="monthly">Monthly</option>
+                    <option value="sixMonth">6 months</option>
+                    <option value="yearly">Yearly</option>
+                  </select>
+                </div>
+                <div>
+                  <label htmlFor="edit-user-plan-status" className="text-sm font-semibold text-zinc-900">
+                    Plan status
+                  </label>
+                  <select
+                    id="edit-user-plan-status"
+                    value={editPlanStatus}
+                    onChange={(e) =>
+                      setEditPlanStatus(e.target.value as "active" | "expired" | "cancelled" | "none")
+                    }
+                    className="mt-2 h-11 w-full rounded-xl border border-zinc-200 bg-white px-3 text-sm text-zinc-900 outline-none ring-zinc-900/10 focus:ring-4"
+                  >
+                    <option value="none">None</option>
+                    <option value="active">Active</option>
+                    <option value="expired">Expired</option>
+                    <option value="cancelled">Cancelled</option>
+                  </select>
+                </div>
+                <div>
+                  <label htmlFor="edit-user-plan-start" className="text-sm font-semibold text-zinc-900">
+                    Plan start date
+                  </label>
+                  <input
+                    id="edit-user-plan-start"
+                    type="date"
+                    value={editPlanStartedAt}
+                    onChange={(e) => setEditPlanStartedAt(e.target.value)}
+                    className="mt-2 h-11 w-full rounded-xl border border-zinc-200 bg-white px-3 text-sm text-zinc-900 outline-none ring-zinc-900/10 focus:ring-4"
+                  />
+                </div>
+                <div>
+                  <label htmlFor="edit-user-plan-expiry" className="text-sm font-semibold text-zinc-900">
+                    Plan expiry date
+                  </label>
+                  <input
+                    id="edit-user-plan-expiry"
+                    type="date"
+                    value={editPlanExpiresAt}
+                    onChange={(e) => setEditPlanExpiresAt(e.target.value)}
+                    className="mt-2 h-11 w-full rounded-xl border border-zinc-200 bg-white px-3 text-sm text-zinc-900 outline-none ring-zinc-900/10 focus:ring-4"
+                  />
+                </div>
+                <div className="rounded-xl border border-zinc-200 bg-zinc-50 px-3 py-3">
+                  <p className="text-sm font-semibold text-zinc-900">Re-activate plan</p>
+                  <p className="mt-1 text-xs text-zinc-600">
+                    Sets status to active, start date to today, and expiry from selected billing cycle.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => void reactivatePlan()}
+                    disabled={editBusy}
+                    className="mt-3 inline-flex h-9 items-center justify-center rounded-lg border border-zinc-300 bg-white px-3 text-xs font-semibold text-zinc-900 hover:bg-zinc-100 disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    Reactivate plan
+                  </button>
+                </div>
+                <div className="rounded-xl border border-zinc-200 bg-zinc-50 px-3 py-3">
+                  <p className="text-sm font-semibold text-zinc-900">Storage usage</p>
+                  <div className="mt-1 space-y-1 text-xs text-zinc-600">
+                    <p>Total: {formatBytes(Number(users.find((u) => userRowId(u) === editUserId)?.usage?.totalBytes || 0))}</p>
+                    <p>
+                      Digital albums:{" "}
+                      {formatBytes(Number(users.find((u) => userRowId(u) === editUserId)?.usage?.albumsBytes || 0))}
+                    </p>
+                    <p>
+                      Photo selection:{" "}
+                      {formatBytes(
+                        Number(users.find((u) => userRowId(u) === editUserId)?.usage?.photoSelectionBytes || 0)
+                      )}
+                    </p>
+                  </div>
                 </div>
                 <div>
                   <label htmlFor="edit-user-name" className="text-sm font-semibold text-zinc-900">

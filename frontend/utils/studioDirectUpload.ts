@@ -353,3 +353,42 @@ export async function uploadAlbumGalleryTabDirect(params: {
   onProgress(100);
   return all;
 }
+
+export async function uploadPhotoSelectionOgImageDirect(params: {
+  projectId: string;
+  file: File;
+  api: StudioFetch;
+  onProgress?: (p: number) => void;
+}): Promise<any> {
+  const { projectId, file, api, onProgress } = params;
+  onProgress?.(0);
+  const prep = await api<{ upload: DirectUploadSlot }>(
+    `/api/studio/photo-selection/projects/${encodeURIComponent(projectId)}/og-image/direct-upload/prepare`,
+    {
+      method: "POST",
+      body: {
+        file: {
+          originalName: file.name,
+          mimeType: file.type || "application/octet-stream",
+          byteSize: file.size,
+        },
+      },
+    }
+  );
+  const spec = prep.upload;
+  await putFileToSignedUrl(file, spec.uploadUrl, spec.headers, (p) => onProgress?.(Math.max(5, Math.min(85, p))));
+  const commit = await api<{ ogImage?: any; project?: any }>(
+    `/api/studio/photo-selection/projects/${encodeURIComponent(projectId)}/og-image/direct-upload/commit`,
+    {
+      method: "POST",
+      body: {
+        key: spec.key,
+        originalName: file.name,
+        mimeType: file.type || "application/octet-stream",
+        byteSize: file.size,
+      },
+    }
+  );
+  onProgress?.(100);
+  return commit;
+}

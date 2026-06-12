@@ -19,6 +19,7 @@ const ALL_TAB_ID = "__all__";
 
 type SelectionPhoto = {
   id: string;
+  thumbUrl: string | null;
   url: string;
   originalUrl: string | null;
   tabId: string | null;
@@ -47,6 +48,7 @@ type SharePayload = {
     clientTabs?: Array<{ id?: string; label?: string }>;
     photos?: Array<{
       id?: string;
+      thumbUrl?: string;
       url?: string;
       originalUrl?: string;
       tabId?: string | null;
@@ -172,6 +174,10 @@ export default function ShareAlbumPage() {
       (rows ?? [])
         .map((img, idx) => ({
           id: String(img?.id ?? `ps-${idx}`),
+          thumbUrl:
+            typeof img?.thumbUrl === "string" && img.thumbUrl
+              ? img.thumbUrl
+              : null,
           url: String(img?.url ?? ""),
           originalUrl:
             typeof img?.originalUrl === "string" && img.originalUrl
@@ -202,6 +208,13 @@ export default function ShareAlbumPage() {
         }));
       if (declaredTabs.length > 0) {
         setSelectionTabs(declaredTabs);
+        if (mode === "replace") {
+          setSelectionActiveTabId((prev) => {
+            if (prev !== ALL_TAB_ID && declaredTabs.some((tab) => tab.id === prev))
+              return prev;
+            return declaredTabs[0]!.id;
+          });
+        }
       } else {
         const inferredIncomingTabIds = Array.from(
           new Set(
@@ -222,6 +235,19 @@ export default function ShareAlbumPage() {
             return existing ?? { id, label: `Tab ${idx + 1}` };
           });
         });
+        if (mode === "replace") {
+          const firstInferredTabId =
+            inferredIncomingTabIds.length > 0 ? inferredIncomingTabIds[0] : "";
+          setSelectionActiveTabId((prev) => {
+            if (
+              prev !== ALL_TAB_ID &&
+              inferredIncomingTabIds.includes(String(prev))
+            ) {
+              return prev;
+            }
+            return firstInferredTabId || ALL_TAB_ID;
+          });
+        }
       }
 
       setSelectionPhotos((prev) => {

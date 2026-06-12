@@ -49,6 +49,30 @@ const recentActivity = [
   },
 ];
 
+const storagePlans = [
+  {
+    id: "250gb",
+    name: "250 GB",
+    monthly: "3000/month",
+    sixMonth: "12000/6 months",
+    yearly: "20000/year",
+  },
+  {
+    id: "500gb",
+    name: "500 GB",
+    monthly: "5000/month",
+    sixMonth: "20000/6 months",
+    yearly: "35000/year",
+  },
+  {
+    id: "1tb",
+    name: "1 TB",
+    monthly: "7500/month",
+    sixMonth: "30000/6 months",
+    yearly: "50000/year",
+  },
+];
+
 export default function StudioDashboardOverviewPage() {
   const [userRole, setUserRole] = useState<StudioUserRole | null>(null);
 
@@ -73,6 +97,52 @@ export default function StudioDashboardOverviewPage() {
 
   return (
     <>
+      <section className="rounded-2xl border border-zinc-200/80 bg-white p-5 shadow-sm sm:p-6">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-wider text-zinc-500">Studio pricing</p>
+            <h2 className="mt-1 text-xl font-semibold text-zinc-900">Choose your storage plan</h2>
+            <p className="mt-2 text-sm text-zinc-600">
+              All plans include digital invitation, digital album, and photo selection.
+            </p>
+          </div>
+        </div>
+
+        <div className="mt-6 grid gap-4 lg:grid-cols-2 xl:grid-cols-4">
+          {storagePlans.map((plan) => (
+            <article key={plan.id} className="rounded-2xl border border-zinc-200 bg-zinc-50/50 p-4">
+              <h3 className="text-base font-semibold text-zinc-900">{plan.name}</h3>
+              <dl className="mt-4 space-y-2 text-sm">
+                <div className="flex items-center justify-between gap-3 rounded-lg bg-white px-3 py-2">
+                  <dt className="text-zinc-500">Monthly</dt>
+                  <dd className="font-semibold text-zinc-900">{plan.monthly}</dd>
+                </div>
+                <div className="flex items-center justify-between gap-3 rounded-lg bg-white px-3 py-2">
+                  <dt className="text-zinc-500">6 Months</dt>
+                  <dd className="font-semibold text-zinc-900">{plan.sixMonth}</dd>
+                </div>
+                <div className="flex items-center justify-between gap-3 rounded-lg bg-white px-3 py-2">
+                  <dt className="text-zinc-500">1 Year</dt>
+                  <dd className="font-semibold text-zinc-900">{plan.yearly}</dd>
+                </div>
+              </dl>
+            </article>
+          ))}
+
+          <article className="rounded-2xl border border-zinc-900/20 bg-zinc-900 p-4 text-white">
+            <h3 className="text-base font-semibold">Custom Plan</h3>
+            <p className="mt-3 text-sm text-zinc-200">
+              Need more storage or a tailored setup? Contact us for a custom quote.
+            </p>
+            <ul className="mt-4 space-y-1.5 text-sm text-zinc-100">
+              <li>Digital invitation included</li>
+              <li>Digital album included</li>
+              <li>Photo selection included</li>
+            </ul>
+          </article>
+        </div>
+      </section>
+
       {showOverviewSection ? (
         <>
       <PageHeader

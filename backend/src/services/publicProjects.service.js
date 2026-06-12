@@ -331,6 +331,11 @@ function sanitizeFilename(name) {
     .trim();
 }
 
+function originalFileNameFromSource(rawName, fallbackBase, ext) {
+  const safe = sanitizeFilename(rawName || fallbackBase) || fallbackBase;
+  return /\.[a-z0-9]{1,8}$/i.test(safe) ? safe : `${safe}.${ext}`;
+}
+
 function albumImages(album) {
   return [
     ...(album?.bannerImage ? [album.bannerImage] : []),
@@ -361,10 +366,13 @@ function resolveAlbumImageDownloadFromAlbum(
     sanitizeFilename(image.originalName || image.id || "image") || "image";
   const base = rawBase.replace(/\.[^.]+$/, "") || "image";
   const ext = extensionFromMime(image.mimeType);
+  const originalFileName = originalFileNameFromSource(
+    image.originalName || image.id || "image",
+    "image",
+    ext,
+  );
   const fileName =
-    variant === "original"
-      ? `${base}-original.${ext}`
-      : `${base}-optimized.webp`;
+    variant === "original" ? originalFileName : `${base}-optimized.webp`;
 
   return {
     sourceUrl,
@@ -486,10 +494,13 @@ async function resolvePublicPhotoSelectionDownloadBySlug(
     sanitizeFilename(photo.originalName || photo.id || "photo") || "photo";
   const base = rawBase.replace(/\.[^.]+$/, "") || "photo";
   const ext = extensionFromMime(photo.mimeType);
+  const originalFileName = originalFileNameFromSource(
+    photo.originalName || photo.id || "photo",
+    "photo",
+    ext,
+  );
   const fileName =
-    variant === "original"
-      ? `${base}-original.${ext}`
-      : `${base}-optimized.webp`;
+    variant === "original" ? originalFileName : `${base}-optimized.webp`;
 
   return {
     sourceUrl,
@@ -556,10 +567,13 @@ async function resolvePublicPhotoSelectionDownload(
     sanitizeFilename(photo.originalName || photo.id || "photo") || "photo";
   const base = rawBase.replace(/\.[^.]+$/, "") || "photo";
   const ext = extensionFromMime(photo.mimeType);
+  const originalFileName = originalFileNameFromSource(
+    photo.originalName || photo.id || "photo",
+    "photo",
+    ext,
+  );
   const fileName =
-    variant === "original"
-      ? `${base}-original.${ext}`
-      : `${base}-optimized.webp`;
+    variant === "original" ? originalFileName : `${base}-optimized.webp`;
 
   return {
     sourceUrl,
