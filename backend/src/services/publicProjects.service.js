@@ -38,6 +38,13 @@ function safePublicPhotoSelection(project) {
       ? ps.toObject({ flattenMaps: true })
       : { ...ps };
   if (raw && typeof raw === "object" && "pinHash" in raw) delete raw.pinHash;
+  if (Array.isArray(raw.clientTabs)) {
+    raw.clientTabs = [...raw.clientTabs].sort((a, b) => {
+      const ao = Number.isFinite(Number(a?.order)) ? Number(a.order) : 0;
+      const bo = Number.isFinite(Number(b?.order)) ? Number(b.order) : 0;
+      return ao - bo;
+    });
+  }
   return raw;
 }
 

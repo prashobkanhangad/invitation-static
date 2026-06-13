@@ -13,6 +13,7 @@ import {
   Check,
   ChevronDown,
   ChevronRight,
+  ChevronUp,
   Download,
   Eye,
   EyeOff,
@@ -133,6 +134,7 @@ export default function StudioPhotoSelectionSection() {
   const [copiedProjectId, setCopiedProjectId] = useState<string | null>(null);
   const [deletingPhotoId, setDeletingPhotoId] = useState<string | null>(null);
   const [deletingTabId, setDeletingTabId] = useState<string | null>(null);
+  const [reorderingTabId, setReorderingTabId] = useState<string | null>(null);
   const [ogImageUploading, setOgImageUploading] = useState(false);
   const [ogImageUploadError, setOgImageUploadError] = useState<string | null>(
     null,
@@ -189,10 +191,14 @@ export default function StudioPhotoSelectionSection() {
         }))
       : [];
     const tabs = Array.isArray(p?.photoSelection?.clientTabs)
-      ? p.photoSelection.clientTabs.map((t: any) => ({
-          id: String(t.id),
-          label: String(t.label || "Tab"),
-        }))
+      ? [...p.photoSelection.clientTabs]
+          .map((t: any, idx: number) => ({
+            id: String(t.id),
+            label: String(t.label || "Tab"),
+            order: Number.isFinite(Number(t.order)) ? Number(t.order) : idx,
+          }))
+          .sort((a, b) => a.order - b.order)
+          .map(({ id, label }) => ({ id, label }))
       : [];
     const ogRaw = p?.photoSelection?.ogImage;
     const ogImage =
@@ -706,6 +712,37 @@ export default function StudioPhotoSelectionSection() {
     }
   };
 
+  const persistClientPreviewTabs = async (updatedTabs: ClientPreviewTab[]) => {
+    if (!activeProjectId) return false;
+    const previousTabs =
+      projects.find((p) => p.id === activeProjectId)?.clientPreviewTabs ?? [];
+    setProjects((prev) =>
+      prev.map((p) =>
+        p.id !== activeProjectId ? p : { ...p, clientPreviewTabs: updatedTabs },
+      ),
+    );
+    try {
+      await studioApiFetch(
+        `/api/studio/photo-selection/projects/${activeProjectId}`,
+        {
+          method: "PATCH",
+          body: { clientTabs: updatedTabs },
+        },
+      );
+      return true;
+    } catch (e) {
+      setProjects((prev) =>
+        prev.map((p) =>
+          p.id !== activeProjectId
+            ? p
+            : { ...p, clientPreviewTabs: previousTabs },
+        ),
+      );
+      window.alert(e instanceof Error ? e.message : "Failed to update tabs");
+      return false;
+    }
+  };
+
   const addClientPreviewTab = async () => {
     const label = newTabLabelDraft.trim();
     if (!label || !activeProjectId) return;
@@ -713,23 +750,36 @@ export default function StudioPhotoSelectionSection() {
     const existingTabs =
       projects.find((p) => p.id === activeProjectId)?.clientPreviewTabs ?? [];
     const updatedTabs = [...existingTabs, { id: tabId, label }];
-    setProjects((prev) =>
-      prev.map((p) =>
-        p.id !== activeProjectId ? p : { ...p, clientPreviewTabs: updatedTabs },
-      ),
-    );
     setNewTabLabelDraft("");
+    const ok = await persistClientPreviewTabs(updatedTabs);
+    if (!ok) return;
+  };
+
+  const moveClientPreviewTab = async (
+    tabId: string,
+    direction: "up" | "down",
+  ) => {
+    if (!activeProjectId) return;
+    const project = projects.find((p) => p.id === activeProjectId);
+    if (!project) return;
+    const index = project.clientPreviewTabs.findIndex((t) => t.id === tabId);
+    if (index < 0) return;
+    const targetIndex = direction === "up" ? index - 1 : index + 1;
+    if (targetIndex < 0 || targetIndex >= project.clientPreviewTabs.length)
+      return;
+
+    const updatedTabs = [...project.clientPreviewTabs];
+    [updatedTabs[index], updatedTabs[targetIndex]] = [
+      updatedTabs[targetIndex]!,
+      updatedTabs[index]!,
+    ];
+
+    setReorderingTabId(tabId);
     try {
-      await studioApiFetch(
-        `/api/studio/photo-selection/projects/${activeProjectId}`,
-        {
-          method: "PATCH",
-          body: {
-            clientTabs: updatedTabs,
-          },
-        },
-      );
-    } catch {}
+      await persistClientPreviewTabs(updatedTabs);
+    } finally {
+      setReorderingTabId(null);
+    }
   };
 
   const removeClientPreviewTab = async (tabId: string) => {
@@ -762,13 +812,8 @@ export default function StudioPhotoSelectionSection() {
       const updatedTabs = project.clientPreviewTabs.filter(
         (t) => t.id !== tabId,
       );
-      await studioApiFetch(
-        `/api/studio/photo-selection/projects/${activeProjectId}`,
-        {
-          method: "PATCH",
-          body: { clientTabs: updatedTabs },
-        },
-      );
+      const ok = await persistClientPreviewTabs(updatedTabs);
+      if (!ok) return;
       setProjects((prev) =>
         prev.map((p) => {
           if (p.id !== activeProjectId) return p;
@@ -1631,34 +1676,79 @@ export default function StudioPhotoSelectionSection() {
                   <p className="mt-1 text-xs leading-relaxed text-zinc-600">
                     Optional sections for the client gallery. Add tabs here,
                     pick a section when you upload photos, then open Client
-                    preview to verify.
+                    preview to verify. Use the lines and arrows to change tab
+                    order.
                   </p>
                 </div>
               </div>
 
               {p.clientPreviewTabs.length > 0 ? (
                 <ul className="mt-4 space-y-2">
-                  {p.clientPreviewTabs.map((tab) => (
+                  {p.clientPreviewTabs.map((tab, tabIndex) => (
                     <li
                       key={tab.id}
-                      className="flex items-center justify-between gap-2 rounded-xl border border-zinc-200 bg-zinc-50 px-3 py-2"
+                      className="flex items-center gap-2 rounded-xl border border-zinc-200 bg-zinc-50 px-3 py-2"
                     >
-                      <span className="text-sm font-medium text-zinc-900">
+                      <div
+                        className="flex shrink-0 flex-col items-center justify-center gap-[3px] py-0.5"
+                        title="Reorder this tab with the arrows"
+                        aria-hidden="true"
+                      >
+                        <span className="block h-[2px] w-4 rounded-full bg-zinc-400" />
+                        <span className="block h-[2px] w-4 rounded-full bg-zinc-400" />
+                        <span className="block h-[2px] w-4 rounded-full bg-zinc-400" />
+                      </div>
+                      <span className="min-w-0 flex-1 truncate text-sm font-medium text-zinc-900">
                         {tab.label}
                       </span>
-                      <button
-                        type="button"
-                        onClick={() => removeClientPreviewTab(tab.id)}
-                        className="rounded-lg p-1.5 text-zinc-500 hover:bg-white hover:text-zinc-900 disabled:cursor-not-allowed disabled:opacity-50"
-                        aria-label={`Remove tab ${tab.label}`}
-                        disabled={deletingTabId === tab.id}
-                      >
-                        {deletingTabId === tab.id ? (
-                          <span className="text-[10px] font-semibold">...</span>
-                        ) : (
-                          <X className="h-4 w-4" strokeWidth={2} />
-                        )}
-                      </button>
+                      <div className="flex shrink-0 items-center gap-0.5">
+                        <button
+                          type="button"
+                          onClick={() => void moveClientPreviewTab(tab.id, "up")}
+                          className="rounded-lg p-1.5 text-zinc-500 hover:bg-white hover:text-zinc-900 disabled:cursor-not-allowed disabled:opacity-40"
+                          aria-label={`Move ${tab.label} up`}
+                          disabled={
+                            tabIndex === 0 ||
+                            reorderingTabId === tab.id ||
+                            deletingTabId === tab.id
+                          }
+                        >
+                          <ChevronUp className="h-4 w-4" strokeWidth={2} />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() =>
+                            void moveClientPreviewTab(tab.id, "down")
+                          }
+                          className="rounded-lg p-1.5 text-zinc-500 hover:bg-white hover:text-zinc-900 disabled:cursor-not-allowed disabled:opacity-40"
+                          aria-label={`Move ${tab.label} down`}
+                          disabled={
+                            tabIndex === p.clientPreviewTabs.length - 1 ||
+                            reorderingTabId === tab.id ||
+                            deletingTabId === tab.id
+                          }
+                        >
+                          <ChevronDown className="h-4 w-4" strokeWidth={2} />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => removeClientPreviewTab(tab.id)}
+                          className="rounded-lg p-1.5 text-zinc-500 hover:bg-white hover:text-zinc-900 disabled:cursor-not-allowed disabled:opacity-50"
+                          aria-label={`Remove tab ${tab.label}`}
+                          disabled={
+                            deletingTabId === tab.id ||
+                            reorderingTabId === tab.id
+                          }
+                        >
+                          {deletingTabId === tab.id ? (
+                            <span className="text-[10px] font-semibold">
+                              ...
+                            </span>
+                          ) : (
+                            <X className="h-4 w-4" strokeWidth={2} />
+                          )}
+                        </button>
+                      </div>
                     </li>
                   ))}
                 </ul>
