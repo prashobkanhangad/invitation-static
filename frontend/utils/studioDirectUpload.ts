@@ -13,7 +13,7 @@ export type DirectUploadSlot = {
 };
 
 const CHUNK_SIZE = 100;
-const UPLOAD_CONCURRENCY = 4;
+const UPLOAD_CONCURRENCY = 6;
 const JOB_POLL_MS = 1500;
 const JOB_TIMEOUT_MS = 20 * 60 * 1000;
 

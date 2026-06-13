@@ -8,6 +8,7 @@ const {
   PutObjectCommand,
   GetObjectCommand,
   DeleteObjectCommand,
+  CopyObjectCommand,
   ListObjectsV2Command,
 } = require("@aws-sdk/client-s3");
 const { getSignedUrl } = require("@aws-sdk/s3-request-presigner");
@@ -112,6 +113,46 @@ async function uploadBufferByProvider({ buffer, contentType, key, provider }) {
   if (provider === "gcp_storage")
     return uploadToGcp({ buffer, contentType, key });
   return uploadToAws({ buffer, contentType, key });
+}
+
+function publicUrlForKey(key, provider) {
+  if (provider === "gcp_storage") {
+    const bucketName = (process.env.GCP_STORAGE_BUCKET || "").trim();
+    return `https://storage.googleapis.com/${bucketName}/${key}`;
+  }
+  const bucket = process.env.AWS_S3_BUCKET;
+  const region = process.env.AWS_REGION;
+  const publicBase =
+    process.env.AWS_S3_PUBLIC_BASE_URL ||
+    `https://${bucket}.s3.${region}.amazonaws.com`;
+  return `${publicBase.replace(/\/$/, "")}/${key}`;
+}
+
+/** Server-side copy within the same bucket — faster than re-uploading large originals. */
+async function copyObjectAtKey({ sourceKey, destKey, contentType, provider }) {
+  const ct = contentType || "application/octet-stream";
+  if (provider === "gcp_storage") {
+    const bucket = buildGcpBucket();
+    await bucket.file(sourceKey).copy(bucket.file(destKey));
+    await bucket.file(destKey).setMetadata({
+      contentType: ct,
+      cacheControl: "public, max-age=31536000",
+    });
+    return publicUrlForKey(destKey, provider);
+  }
+  const awsBucket = process.env.AWS_S3_BUCKET;
+  if (!awsBucket) throw new Error("Missing AWS_S3_BUCKET");
+  const client = buildAwsClient();
+  await client.send(
+    new CopyObjectCommand({
+      Bucket: awsBucket,
+      CopySource: `${awsBucket}/${encodeURIComponent(sourceKey)}`,
+      Key: destKey,
+      ContentType: ct,
+      MetadataDirective: "REPLACE",
+    }),
+  );
+  return publicUrlForKey(destKey, provider);
 }
 
 async function uploadLocalFileByProvider({
@@ -267,21 +308,75 @@ async function uploadImageByProvider({ req, file, folder, provider }) {
 }
 
 async function uploadImageVariantsByProvider({ file, folder, provider }) {
-  const originalUrl = await uploadImageByProvider({ file, folder, provider });
+  const webpBase = (file.originalname || "image").replace(/\.[^.]+$/, ".webp");
+  const displayKey = `${folder}/display/${safeName(webpBase)}`;
+  const thumbKey = `${folder}/thumb/${safeName(webpBase)}`;
+  const base = sharp(file.buffer).rotate();
 
-  const displayBuffer = await sharp(file.buffer)
-    .rotate()
-    .resize({ width: 2200, fit: "inside", withoutEnlargement: true })
-    .webp({ quality: 86 })
-    .toBuffer();
-  const thumbBuffer = await sharp(file.buffer)
-    .rotate()
-    .resize({ width: 480, fit: "inside", withoutEnlargement: true })
-    .webp({ quality: 76 })
-    .toBuffer();
+  const [originalUrl, displayBuffer, thumbBuffer] = await Promise.all([
+    uploadImageByProvider({ file, folder, provider }),
+    base
+      .clone()
+      .resize({ width: 2200, fit: "inside", withoutEnlargement: true })
+      .webp({ quality: 86 })
+      .toBuffer(),
+    base
+      .clone()
+      .resize({ width: 480, fit: "inside", withoutEnlargement: true })
+      .webp({ quality: 76 })
+      .toBuffer(),
+  ]);
 
-  const displayKey = `${folder}/display/${safeName((file.originalname || "image").replace(/\.[^.]+$/, ".webp"))}`;
-  const thumbKey = `${folder}/thumb/${safeName((file.originalname || "image").replace(/\.[^.]+$/, ".webp"))}`;
+  const [displayUrl, thumbUrl] = await Promise.all([
+    uploadBufferByProvider({
+      buffer: displayBuffer,
+      contentType: "image/webp",
+      key: displayKey,
+      provider,
+    }),
+    uploadBufferByProvider({
+      buffer: thumbBuffer,
+      contentType: "image/webp",
+      key: thumbKey,
+      provider,
+    }),
+  ]);
+
+  return { originalUrl, displayUrl, thumbUrl };
+}
+
+/** Direct-upload commit: copy staging → original, generate variants in parallel. */
+async function uploadImageVariantsFromDirectStaging({
+  buffer,
+  stagingKey,
+  file,
+  folder,
+  provider,
+}) {
+  const originalKey = `${folder}/${safeName(file.originalname)}`;
+  const webpBase = (file.originalname || "image").replace(/\.[^.]+$/, ".webp");
+  const displayKey = `${folder}/display/${safeName(webpBase)}`;
+  const thumbKey = `${folder}/thumb/${safeName(webpBase)}`;
+  const base = sharp(buffer).rotate();
+
+  const [originalUrl, displayBuffer, thumbBuffer] = await Promise.all([
+    copyObjectAtKey({
+      sourceKey: stagingKey,
+      destKey: originalKey,
+      contentType: file.mimetype,
+      provider,
+    }),
+    base
+      .clone()
+      .resize({ width: 2200, fit: "inside", withoutEnlargement: true })
+      .webp({ quality: 86 })
+      .toBuffer(),
+    base
+      .clone()
+      .resize({ width: 480, fit: "inside", withoutEnlargement: true })
+      .webp({ quality: 76 })
+      .toBuffer(),
+  ]);
 
   const [displayUrl, thumbUrl] = await Promise.all([
     uploadBufferByProvider({
@@ -306,6 +401,8 @@ module.exports = {
   safeName,
   uploadImageByProvider,
   uploadImageVariantsByProvider,
+  uploadImageVariantsFromDirectStaging,
+  copyObjectAtKey,
   createDirectUploadWriteUrl,
   downloadObjectBuffer,
   deleteObjectAtKey,
