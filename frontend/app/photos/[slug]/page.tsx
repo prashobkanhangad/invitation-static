@@ -60,6 +60,50 @@ function storageKeyForSlug(slug: string) {
   return `invyto-photo-sel-access:slug:${encodeURIComponent(slug)}`;
 }
 
+function extractDeclaredTabs(data: PublicPhotoSelectionPayload) {
+  return (data.photoSelection?.clientTabs ?? [])
+    .filter((tab) => typeof tab?.id === "string")
+    .map((tab, idx) => ({
+      id: String(tab?.id),
+      label: String(tab?.label ?? `Tab ${idx + 1}`),
+    }));
+}
+
+function resolveFirstTabId(
+  data: PublicPhotoSelectionPayload,
+  declaredTabs: Array<{ id: string; label: string }>,
+) {
+  if (declaredTabs.length > 0) return declaredTabs[0]!.id;
+  const inferred = Array.from(
+    new Set(
+      (data.photoSelection?.photos ?? [])
+        .map((photo) => photo?.tabId)
+        .filter(
+          (tabId): tabId is string =>
+            typeof tabId === "string" && tabId.length > 0,
+        ),
+    ),
+  );
+  return inferred[0] ?? ALL_TAB_ID;
+}
+
+function buildSelectionPath(
+  slug: string,
+  tabId: string,
+  cursor?: string | null,
+  limit = PUBLIC_PHOTO_SELECTION_PAGE_LIMIT,
+) {
+  const qs = new URLSearchParams();
+  qs.set("limit", String(limit));
+  if (cursor) qs.set("cursor", cursor);
+  if (tabId === SELECTED_TAB_ID) {
+    qs.set("tabId", SELECTED_TAB_ID);
+  } else if (tabId !== ALL_TAB_ID) {
+    qs.set("tabId", tabId);
+  }
+  return `/api/public/photos/${encodeURIComponent(slug)}?${qs.toString()}`;
+}
+
 export default function PublicPhotoSelectionPage() {
   const params = useParams<{ slug: string }>();
 
@@ -82,8 +126,9 @@ export default function PublicPhotoSelectionPage() {
     Array<{ id: string; label: string }>
   >([]);
   const [selectionPhotos, setSelectionPhotos] = useState<SelectionPhoto[]>([]);
-  const [selectionActiveTabId, setSelectionActiveTabId] =
-    useState<string>(ALL_TAB_ID);
+  const [selectionActiveTabId, setSelectionActiveTabId] = useState<string>(
+    ALL_TAB_ID,
+  );
   const [selectionNextCursor, setSelectionNextCursor] = useState<string | null>(
     null,
   );
@@ -106,7 +151,6 @@ export default function PublicPhotoSelectionPage() {
     setPinGate(false);
     setPinInput("");
     setPinError(null);
-    setSelectionActiveTabId(ALL_TAB_ID);
   }, [slug]);
 
   const applyPayload = useCallback(
@@ -139,22 +183,10 @@ export default function PublicPhotoSelectionPage() {
 
       setSelectionProjectName(String(data.project?.name ?? "Photo selection"));
       setSelectionStudioName(String(data.project?.studioName ?? "").trim());
-      const declaredTabs = (data.photoSelection?.clientTabs ?? [])
-        .filter((tab) => typeof tab?.id === "string")
-        .map((tab, idx) => ({
-          id: String(tab?.id),
-          label: String(tab?.label ?? `Tab ${idx + 1}`),
-        }));
+
+      const declaredTabs = extractDeclaredTabs(data);
       if (declaredTabs.length > 0) {
         setSelectionTabs(declaredTabs);
-        if (mode === "replace") {
-          setSelectionActiveTabId((prev) => {
-            if (prev === ALL_TAB_ID) return ALL_TAB_ID;
-            if (prev === SELECTED_TAB_ID) return SELECTED_TAB_ID;
-            if (declaredTabs.some((tab) => tab.id === prev)) return prev;
-            return declaredTabs[0]!.id;
-          });
-        }
       } else {
         const inferredIncomingTabIds = Array.from(
           new Set(
@@ -166,23 +198,15 @@ export default function PublicPhotoSelectionPage() {
               ),
           ),
         );
-        setSelectionTabs((prev) => {
-          const ids = Array.from(
-            new Set([...prev.map((tab) => tab.id), ...inferredIncomingTabIds]),
-          );
-          return ids.map((id, idx) => {
-            const existing = prev.find((tab) => tab.id === id);
-            return existing ?? { id, label: `Tab ${idx + 1}` };
-          });
-        });
-        if (mode === "replace") {
-          const firstInferredTabId =
-            inferredIncomingTabIds.length > 0 ? inferredIncomingTabIds[0] : "";
-          setSelectionActiveTabId((prev) => {
-            if (prev === ALL_TAB_ID) return ALL_TAB_ID;
-            if (prev === SELECTED_TAB_ID) return SELECTED_TAB_ID;
-            if (inferredIncomingTabIds.includes(String(prev))) return prev;
-            return firstInferredTabId || ALL_TAB_ID;
+        if (inferredIncomingTabIds.length > 0) {
+          setSelectionTabs((prev) => {
+            const ids = Array.from(
+              new Set([...prev.map((tab) => tab.id), ...inferredIncomingTabIds]),
+            );
+            return ids.map((id, idx) => {
+              const existing = prev.find((tab) => tab.id === id);
+              return existing ?? { id, label: `Tab ${idx + 1}` };
+            });
           });
         }
       }
@@ -213,87 +237,59 @@ export default function PublicPhotoSelectionPage() {
     [],
   );
 
-  const selectionPath = useCallback(
-    (cursor?: string | null) => {
-      const qs = new URLSearchParams();
-      qs.set("limit", String(PUBLIC_PHOTO_SELECTION_PAGE_LIMIT));
-      if (cursor) qs.set("cursor", cursor);
-      if (selectionActiveTabId === SELECTED_TAB_ID) {
-        qs.set("tabId", SELECTED_TAB_ID);
-      } else if (selectionActiveTabId !== ALL_TAB_ID) {
-        qs.set("tabId", selectionActiveTabId);
-      }
-      return `/api/public/photos/${encodeURIComponent(slug || "")}?${qs.toString()}`;
-    },
-    [slug, selectionActiveTabId],
-  );
-
   const selectionStatsPath = useCallback(
     () =>
       `/api/public/photos/${encodeURIComponent(slug || "")}/photo-selection/stats`,
     [slug],
   );
 
-  useEffect(() => {
-    let cancelled = false;
-
-    async function load() {
-      if (!slug || !String(slug).trim()) {
-        if (!cancelled) {
-          setError("Invalid link");
-          setLoading(false);
-          setPinGate(false);
-        }
-        return;
-      }
-      setLoading(true);
-      setError(null);
-      setSelectionStudioName("");
-      setSelectionPhotos([]);
-      setSelectionTabs([]);
-      setSelectionHasMore(false);
-      setSelectionNextCursor(null);
-      setSelectionLoadingMore(false);
+  const loadStats = useCallback(async () => {
+    try {
+      const stats = await apiFetch<PublicPhotoSelectionStatsPayload>(
+        selectionStatsPath(),
+        { token: accessToken || null },
+      );
+      setSelectionTotalPhotos(
+        typeof stats.photoSelectionStats?.totalPhotos === "number"
+          ? stats.photoSelectionStats.totalPhotos
+          : null,
+      );
+      setSelectionSelectedPhotos(
+        typeof stats.photoSelectionStats?.selectedPhotos === "number"
+          ? stats.photoSelectionStats.selectedPhotos
+          : null,
+      );
+    } catch {
       setSelectionTotalPhotos(null);
       setSelectionSelectedPhotos(null);
+    }
+  }, [accessToken, selectionStatsPath]);
+
+  const loadPhotosForTab = useCallback(
+    async (tabId: string, mode: "replace" | "append" = "replace") => {
+      if (!slug || !String(slug).trim()) return;
+
+      if (mode === "replace") {
+        setLoading(true);
+        setError(null);
+        setSelectionPhotos([]);
+        setSelectionHasMore(false);
+        setSelectionNextCursor(null);
+        setSelectionLoadingMore(false);
+      }
 
       try {
         const data = await apiFetch<PublicPhotoSelectionPayload>(
-          selectionPath(),
-          {
-            token: accessToken || null,
-          },
+          buildSelectionPath(slug, tabId),
+          { token: accessToken || null },
         );
-
-        if (cancelled) return;
-        applyPayload(data, "replace");
-        try {
-          const stats = await apiFetch<PublicPhotoSelectionStatsPayload>(
-            selectionStatsPath(),
-            { token: accessToken || null },
-          );
-          if (!cancelled) {
-            setSelectionTotalPhotos(
-              typeof stats.photoSelectionStats?.totalPhotos === "number"
-                ? stats.photoSelectionStats.totalPhotos
-                : null,
-            );
-            setSelectionSelectedPhotos(
-              typeof stats.photoSelectionStats?.selectedPhotos === "number"
-                ? stats.photoSelectionStats.selectedPhotos
-                : null,
-            );
-          }
-        } catch {
-          if (!cancelled) {
-            setSelectionTotalPhotos(null);
-            setSelectionSelectedPhotos(null);
-          }
+        applyPayload(data, mode);
+        if (mode === "replace") {
+          await loadStats();
         }
         setPinGate(false);
         setPinError(null);
       } catch (err) {
-        if (cancelled) return;
         const e = err as Error & { pinRequired?: boolean };
         if (e.pinRequired) {
           setPinGate(true);
@@ -310,22 +306,92 @@ export default function PublicPhotoSelectionPage() {
           setPinGate(false);
         }
       } finally {
+        if (mode === "replace") setLoading(false);
+      }
+    },
+    [slug, accessToken, applyPayload, loadStats],
+  );
+
+  useEffect(() => {
+    if (!slug || !String(slug).trim()) {
+      setError("Invalid link");
+      setLoading(false);
+      setPinGate(false);
+      return;
+    }
+
+    let cancelled = false;
+
+    async function initGallery() {
+      setLoading(true);
+      setError(null);
+      setSelectionStudioName("");
+      setSelectionProjectName("");
+      setSelectionPhotos([]);
+      setSelectionTabs([]);
+      setSelectionHasMore(false);
+      setSelectionNextCursor(null);
+      setSelectionLoadingMore(false);
+      setSelectionTotalPhotos(null);
+      setSelectionSelectedPhotos(null);
+
+      try {
+        const peek = await apiFetch<PublicPhotoSelectionPayload>(
+          buildSelectionPath(slug!, ALL_TAB_ID, null, 1),
+          { token: accessToken || null },
+        );
+        if (cancelled) return;
+
+        const tabs = extractDeclaredTabs(peek);
+        const firstTabId = resolveFirstTabId(peek, tabs);
+        setSelectionTabs(tabs);
+        setSelectionActiveTabId(firstTabId);
+
+        const data = await apiFetch<PublicPhotoSelectionPayload>(
+          buildSelectionPath(slug!, firstTabId),
+          { token: accessToken || null },
+        );
+        if (cancelled) return;
+
+        applyPayload(data, "replace");
+        await loadStats();
+        setPinGate(false);
+        setPinError(null);
+      } catch (err) {
+        if (cancelled) return;
+        const e = err as Error & { pinRequired?: boolean };
+        if (e.pinRequired) {
+          setPinGate(true);
+          setPinError(null);
+          if (typeof window !== "undefined")
+            sessionStorage.removeItem(storageKeyForSlug(slug!));
+          setAccessToken("");
+          setSelectionTotalPhotos(null);
+          setSelectionSelectedPhotos(null);
+        } else {
+          setError(
+            e instanceof Error ? e.message : "Failed to load photo selection",
+          );
+          setPinGate(false);
+        }
+      } finally {
         if (!cancelled) setLoading(false);
       }
     }
 
-    void load();
+    void initGallery();
     return () => {
       cancelled = true;
     };
-  }, [
-    slug,
-    accessToken,
-    applyPayload,
-    selectionPath,
-    selectionStatsPath,
-    selectionActiveTabId,
-  ]);
+  }, [slug, accessToken, applyPayload, loadStats]);
+
+  const handleTabChange = useCallback(
+    (tabId: string) => {
+      setSelectionActiveTabId(tabId);
+      void loadPhotosForTab(tabId, "replace");
+    },
+    [loadPhotosForTab],
+  );
 
   const submitPin = async () => {
     if (!slug?.trim()) return;
@@ -358,15 +424,18 @@ export default function PublicPhotoSelectionPage() {
   };
 
   const loadMorePhotos = useCallback(async () => {
-    if (!selectionHasMore || !selectionNextCursor || selectionLoadingMore)
+    if (
+      !slug ||
+      !selectionHasMore ||
+      !selectionNextCursor ||
+      selectionLoadingMore
+    )
       return;
     setSelectionLoadingMore(true);
     try {
       const data = await apiFetch<PublicPhotoSelectionPayload>(
-        selectionPath(selectionNextCursor),
-        {
-          token: accessToken || null,
-        },
+        buildSelectionPath(slug, selectionActiveTabId, selectionNextCursor),
+        { token: accessToken || null },
       );
       applyPayload(data, "append");
     } catch (e) {
@@ -377,10 +446,11 @@ export default function PublicPhotoSelectionPage() {
       setSelectionLoadingMore(false);
     }
   }, [
+    slug,
     selectionHasMore,
     selectionNextCursor,
     selectionLoadingMore,
-    selectionPath,
+    selectionActiveTabId,
     accessToken,
     applyPayload,
   ]);
@@ -448,7 +518,7 @@ export default function PublicPhotoSelectionPage() {
       tabs={selectionTabs}
       photos={selectionPhotos}
       activeTabId={selectionActiveTabId}
-      onTabChange={setSelectionActiveTabId}
+      onTabChange={handleTabChange}
       hasMorePhotos={selectionHasMore}
       loadingMorePhotos={selectionLoadingMore}
       onLoadMorePhotos={loadMorePhotos}

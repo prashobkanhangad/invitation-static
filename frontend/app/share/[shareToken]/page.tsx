@@ -19,6 +19,52 @@ import type {
 
 const PUBLIC_PHOTO_SELECTION_PAGE_LIMIT = 30;
 
+function extractDeclaredSelectionTabs(
+  tabs: NonNullable<SharePayload["photoSelection"]>["clientTabs"],
+) {
+  return (tabs ?? [])
+    .filter((tab) => typeof tab?.id === "string")
+    .map((tab, idx) => ({
+      id: String(tab?.id),
+      label: String(tab?.label ?? `Tab ${idx + 1}`),
+    }));
+}
+
+function resolveFirstSelectionTabId(
+  data: SharePayload,
+  declaredTabs: Array<{ id: string; label: string }>,
+) {
+  if (declaredTabs.length > 0) return declaredTabs[0]!.id;
+  const inferred = Array.from(
+    new Set(
+      (data.photoSelection?.photos ?? [])
+        .map((photo) => photo?.tabId)
+        .filter(
+          (tabId): tabId is string =>
+            typeof tabId === "string" && tabId.length > 0,
+        ),
+    ),
+  );
+  return inferred[0] ?? ALL_TAB_ID;
+}
+
+function buildShareSelectionPath(
+  shareToken: string,
+  tabId: string,
+  cursor?: string | null,
+  limit = PUBLIC_PHOTO_SELECTION_PAGE_LIMIT,
+) {
+  const qs = new URLSearchParams();
+  qs.set("limit", String(limit));
+  if (cursor) qs.set("cursor", cursor);
+  if (tabId === SELECTED_TAB_ID) {
+    qs.set("tabId", SELECTED_TAB_ID);
+  } else if (tabId !== ALL_TAB_ID) {
+    qs.set("tabId", tabId);
+  }
+  return `/api/public/projects/${encodeURIComponent(shareToken)}?${qs.toString()}`;
+}
+
 type SelectionPhoto = {
   id: string;
   thumbUrl: string | null;
@@ -152,18 +198,9 @@ export default function ShareAlbumPage() {
   }, [shareToken]);
 
   const selectionRequestPath = useCallback(
-    (cursor?: string | null) => {
-      const qs = new URLSearchParams();
-      qs.set("limit", String(PUBLIC_PHOTO_SELECTION_PAGE_LIMIT));
-      if (cursor) qs.set("cursor", cursor);
-      if (selectionActiveTabId === SELECTED_TAB_ID) {
-        qs.set("tabId", SELECTED_TAB_ID);
-      } else if (selectionActiveTabId !== ALL_TAB_ID) {
-        qs.set("tabId", selectionActiveTabId);
-      }
-      return `/api/public/projects/${encodeURIComponent(shareToken || "")}?${qs.toString()}`;
-    },
-    [shareToken, selectionActiveTabId],
+    (tabId: string, cursor?: string | null) =>
+      buildShareSelectionPath(shareToken || "", tabId, cursor),
+    [shareToken],
   );
 
   const selectionStatsPath = useCallback(
@@ -205,22 +242,11 @@ export default function ShareAlbumPage() {
 
       setSelectionProjectName(String(data.project?.name ?? "Photo selection"));
       setSelectionStudioName(String(data.project?.studioName ?? "").trim());
-      const declaredTabs = (data.photoSelection?.clientTabs ?? [])
-        .filter((tab) => typeof tab?.id === "string")
-        .map((tab, idx) => ({
-          id: String(tab?.id),
-          label: String(tab?.label ?? `Tab ${idx + 1}`),
-        }));
+      const declaredTabs = extractDeclaredSelectionTabs(
+        data.photoSelection?.clientTabs,
+      );
       if (declaredTabs.length > 0) {
         setSelectionTabs(declaredTabs);
-        if (mode === "replace") {
-          setSelectionActiveTabId((prev) => {
-            if (prev === ALL_TAB_ID) return ALL_TAB_ID;
-            if (prev === SELECTED_TAB_ID) return SELECTED_TAB_ID;
-            if (declaredTabs.some((tab) => tab.id === prev)) return prev;
-            return declaredTabs[0]!.id;
-          });
-        }
       } else {
         const inferredIncomingTabIds = Array.from(
           new Set(
@@ -241,16 +267,6 @@ export default function ShareAlbumPage() {
             return existing ?? { id, label: `Tab ${idx + 1}` };
           });
         });
-        if (mode === "replace") {
-          const firstInferredTabId =
-            inferredIncomingTabIds.length > 0 ? inferredIncomingTabIds[0] : "";
-          setSelectionActiveTabId((prev) => {
-            if (prev === ALL_TAB_ID) return ALL_TAB_ID;
-            if (prev === SELECTED_TAB_ID) return SELECTED_TAB_ID;
-            if (inferredIncomingTabIds.includes(String(prev))) return prev;
-            return firstInferredTabId || ALL_TAB_ID;
-          });
-        }
       }
 
       setSelectionPhotos((prev) => {
@@ -302,9 +318,12 @@ export default function ShareAlbumPage() {
       setSelectionSelectedPhotos(null);
 
       try {
-        const data = await apiFetch<SharePayload>(selectionRequestPath(), {
-          token: selectionAccessToken || null,
-        });
+        const data = await apiFetch<SharePayload>(
+          selectionRequestPath(ALL_TAB_ID),
+          {
+            token: selectionAccessToken || null,
+          },
+        );
 
         if (cancelled) return;
         const tpl = data.template;
@@ -342,7 +361,23 @@ export default function ShareAlbumPage() {
         setAlbumHighlights(highlightsFromAlbumContent(data.albumContent));
         setIsPhotoSelectionShare(Boolean(data.photoSelection));
         if (data.photoSelection) {
-          applySelectionPayload(data, "replace");
+          const declaredTabs = extractDeclaredSelectionTabs(
+            data.photoSelection?.clientTabs,
+          );
+          const firstTabId = resolveFirstSelectionTabId(data, declaredTabs);
+          setSelectionTabs(declaredTabs);
+          setSelectionActiveTabId(firstTabId);
+
+          const selectionData =
+            firstTabId !== ALL_TAB_ID
+              ? await apiFetch<SharePayload>(
+                  selectionRequestPath(firstTabId),
+                  { token: selectionAccessToken || null },
+                )
+              : data;
+          if (cancelled) return;
+
+          applySelectionPayload(selectionData, "replace");
           try {
             const stats = await apiFetch<PublicPhotoSelectionStatsPayload>(
               selectionStatsPath(),
@@ -444,8 +479,63 @@ export default function ShareAlbumPage() {
     selectionStatsPath,
     mapSelectionPhotos,
     applySelectionPayload,
-    selectionActiveTabId,
   ]);
+
+  const loadSelectionPhotosForTab = useCallback(
+    async (tabId: string) => {
+      if (!shareToken) return;
+      setLoading(true);
+      setSelectionPhotos([]);
+      setSelectionHasMore(false);
+      setSelectionNextCursor(null);
+      setSelectionLoadingMore(false);
+      try {
+        const data = await apiFetch<SharePayload>(
+          selectionRequestPath(tabId),
+          { token: selectionAccessToken || null },
+        );
+        applySelectionPayload(data, "replace");
+        try {
+          const stats = await apiFetch<PublicPhotoSelectionStatsPayload>(
+            selectionStatsPath(),
+            { token: selectionAccessToken || null },
+          );
+          setSelectionTotalPhotos(
+            typeof stats.photoSelectionStats?.totalPhotos === "number"
+              ? stats.photoSelectionStats.totalPhotos
+              : null,
+          );
+          setSelectionSelectedPhotos(
+            typeof stats.photoSelectionStats?.selectedPhotos === "number"
+              ? stats.photoSelectionStats.selectedPhotos
+              : null,
+          );
+        } catch {
+          setSelectionTotalPhotos(null);
+          setSelectionSelectedPhotos(null);
+        }
+      } catch (e) {
+        setError(e instanceof Error ? e.message : "Failed to load photos");
+      } finally {
+        setLoading(false);
+      }
+    },
+    [
+      shareToken,
+      selectionAccessToken,
+      selectionRequestPath,
+      selectionStatsPath,
+      applySelectionPayload,
+    ],
+  );
+
+  const handleSelectionTabChange = useCallback(
+    (tabId: string) => {
+      setSelectionActiveTabId(tabId);
+      void loadSelectionPhotosForTab(tabId);
+    },
+    [loadSelectionPhotosForTab],
+  );
 
   const submitSelectionPin = useCallback(async () => {
     if (!shareToken) return;
@@ -490,7 +580,7 @@ export default function ShareAlbumPage() {
     setSelectionLoadingMore(true);
     try {
       const data = await apiFetch<SharePayload>(
-        selectionRequestPath(selectionNextCursor),
+        selectionRequestPath(selectionActiveTabId, selectionNextCursor),
         {
           token: selectionAccessToken || null,
         },
@@ -511,6 +601,7 @@ export default function ShareAlbumPage() {
     selectionRequestPath,
     selectionAccessToken,
     applySelectionPayload,
+    selectionActiveTabId,
   ]);
 
   const onSelectedCountDelta = useCallback((delta: number) => {
@@ -580,7 +671,7 @@ export default function ShareAlbumPage() {
       tabs={selectionTabs}
       photos={selectionPhotos}
       activeTabId={selectionActiveTabId}
-      onTabChange={setSelectionActiveTabId}
+      onTabChange={handleSelectionTabChange}
       hasMorePhotos={selectionHasMore}
       loadingMorePhotos={selectionLoadingMore}
       onLoadMorePhotos={loadMoreSelectionPhotos}
