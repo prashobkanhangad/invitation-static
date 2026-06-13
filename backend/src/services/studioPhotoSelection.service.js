@@ -76,6 +76,22 @@ function studioProjectQuery(user, projectId) {
   return q;
 }
 
+/** Atomically append photos — avoids VersionError when the project changes during long uploads. */
+async function appendPhotoSelectionPhotos(user, projectId, newPhotos) {
+  const q = studioProjectQuery(user, projectId);
+  if (!q) return { error: { status: 404, message: "Project not found" } };
+  if (!Array.isArray(newPhotos) || newPhotos.length === 0) {
+    return { error: { status: 400, message: "No photos to append" } };
+  }
+  const updated = await Project.findOneAndUpdate(
+    q,
+    { $push: { "photoSelection.photos": { $each: newPhotos } } },
+    { new: true },
+  );
+  if (!updated) return { error: { status: 404, message: "Project not found" } };
+  return { project: updated };
+}
+
 function isTruthyPinEnabled(v) {
   return v === true || v === "true" || v === 1 || v === "1";
 }
@@ -247,11 +263,8 @@ async function uploadPhotos(user, projectId, files, payload, req) {
       fav: false,
     });
   }
-  project.photoSelection.photos = [
-    ...(project.photoSelection.photos || []),
-    ...next,
-  ];
-  await project.save();
+  const appendResult = await appendPhotoSelectionPhotos(user, projectId, next);
+  if (appendResult.error) return appendResult;
   return { photos: next };
 }
 
@@ -427,11 +440,8 @@ async function commitPhotoDirectUploads(
       });
   }
 
-  project.photoSelection.photos = [
-    ...(project.photoSelection.photos || []),
-    ...next,
-  ];
-  await project.save();
+  const appendResult = await appendPhotoSelectionPhotos(user, projectId, next);
+  if (appendResult.error) return appendResult;
   return { photos: next };
 }
 
