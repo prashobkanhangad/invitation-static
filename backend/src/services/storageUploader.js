@@ -396,12 +396,75 @@ async function uploadImageVariantsFromDirectStaging({
   return { originalUrl, displayUrl, thumbUrl };
 }
 
+/** Photo selection: original + thumb only (no separate optimized/display file). */
+async function uploadPhotoSelectionAssetsByProvider({ file, folder, provider }) {
+  const webpBase = (file.originalname || "image").replace(/\.[^.]+$/, ".webp");
+  const thumbKey = `${folder}/thumb/${safeName(webpBase)}`;
+  const base = sharp(file.buffer).rotate();
+
+  const [originalUrl, thumbBuffer] = await Promise.all([
+    uploadImageByProvider({ file, folder, provider }),
+    base
+      .clone()
+      .resize({ width: 480, fit: "inside", withoutEnlargement: true })
+      .webp({ quality: 76 })
+      .toBuffer(),
+  ]);
+
+  const thumbUrl = await uploadBufferByProvider({
+    buffer: thumbBuffer,
+    contentType: "image/webp",
+    key: thumbKey,
+    provider,
+  });
+
+  return { originalUrl, thumbUrl };
+}
+
+async function uploadPhotoSelectionAssetsFromDirectStaging({
+  buffer,
+  stagingKey,
+  file,
+  folder,
+  provider,
+}) {
+  const originalKey = `${folder}/${safeName(file.originalname)}`;
+  const webpBase = (file.originalname || "image").replace(/\.[^.]+$/, ".webp");
+  const thumbKey = `${folder}/thumb/${safeName(webpBase)}`;
+  const base = sharp(buffer).rotate();
+
+  const [originalUrl, thumbBuffer] = await Promise.all([
+    copyObjectAtKey({
+      sourceKey: stagingKey,
+      destKey: originalKey,
+      contentType: file.mimetype,
+      provider,
+    }),
+    base
+      .clone()
+      .resize({ width: 480, fit: "inside", withoutEnlargement: true })
+      .webp({ quality: 76 })
+      .toBuffer(),
+  ]);
+
+  const thumbUrl = await uploadBufferByProvider({
+    buffer: thumbBuffer,
+    contentType: "image/webp",
+    key: thumbKey,
+    provider,
+  });
+
+  return { originalUrl, thumbUrl };
+}
+
 module.exports = {
   uploadMemory,
   safeName,
   uploadImageByProvider,
   uploadImageVariantsByProvider,
   uploadImageVariantsFromDirectStaging,
+  uploadPhotoSelectionAssetsByProvider,
+  uploadPhotoSelectionAssetsFromDirectStaging,
   copyObjectAtKey,
   createDirectUploadWriteUrl,
   downloadObjectBuffer,

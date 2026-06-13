@@ -52,7 +52,8 @@ async function ensureSlugForPublishedPhotoSelection(project) {
 }
 const {
   uploadImageVariantsByProvider,
-  uploadImageVariantsFromDirectStaging,
+  uploadPhotoSelectionAssetsByProvider,
+  uploadPhotoSelectionAssetsFromDirectStaging,
   downloadObjectBuffer,
   deleteObjectAtKey,
   createDirectUploadWriteUrl,
@@ -60,6 +61,10 @@ const {
   safeName,
 } = require("./storageUploader");
 const { getActiveStorageProvider } = require("./storageSettings");
+const {
+  resolvePhotoSelectionDownloadMeta,
+  sanitizeFilename: sanitizeDownloadFilename,
+} = require("./photoSelectionDownloadResolve");
 
 const MAX_DIRECT_FILE_BYTES = 100 * 1024 * 1024;
 const MAX_DIRECT_FILES_PER_BATCH = 120;
@@ -265,15 +270,14 @@ async function uploadPhotos(user, projectId, files, payload, req) {
   const folder = `photo-selection/${ownerKey}/${projectKey}`;
   const next = [];
   for (const f of files) {
-    const { originalUrl, displayUrl, thumbUrl } =
-      await uploadImageVariantsByProvider({
-        file: f,
-        folder,
-        provider,
-      });
+    const { originalUrl, thumbUrl } = await uploadPhotoSelectionAssetsByProvider({
+      file: f,
+      folder,
+      provider,
+    });
     next.push({
       id: `ps_${Date.now()}_${Math.random().toString(16).slice(2)}`,
-      url: displayUrl,
+      url: originalUrl,
       originalUrl,
       thumbUrl,
       originalName: f.originalname || "",
@@ -434,11 +438,10 @@ async function commitPhotoDirectUploads(
 
       const file = { buffer, originalname: originalName, mimetype: mimeType };
       let originalUrl;
-      let displayUrl;
       let thumbUrl;
       try {
-        ({ originalUrl, displayUrl, thumbUrl } =
-          await uploadImageVariantsFromDirectStaging({
+        ({ originalUrl, thumbUrl } =
+          await uploadPhotoSelectionAssetsFromDirectStaging({
             buffer,
             stagingKey: key,
             file,
@@ -459,7 +462,7 @@ async function commitPhotoDirectUploads(
 
       return {
         id: `ps_${Date.now()}_${Math.random().toString(16).slice(2)}`,
-        url: displayUrl,
+        url: originalUrl,
         originalUrl,
         thumbUrl,
         originalName,
@@ -661,12 +664,15 @@ async function deletePhoto(user, projectId, photoId) {
   });
 
   const provider = await getActiveStorageProvider();
-  const maybeUrls = [photo?.url, photo?.originalUrl, photo?.thumbUrl];
+  const keys = [
+    ...new Set(
+      [photo?.url, photo?.originalUrl, photo?.thumbUrl]
+        .map((url) => objectKeyFromUrl(url))
+        .filter(Boolean),
+    ),
+  ];
   await Promise.all(
-    maybeUrls
-      .map((url) => objectKeyFromUrl(url))
-      .filter(Boolean)
-      .map((key) => deleteObjectAtKey({ key, provider }).catch(() => {})),
+    keys.map((key) => deleteObjectAtKey({ key, provider }).catch(() => {})),
   );
 
   return { ok: true, photoId };
@@ -686,7 +692,7 @@ async function resolvePhotoDownload(
   user,
   projectId,
   photoId,
-  variant = "optimized",
+  variant = "original",
 ) {
   const project = await getStudioProject(user, projectId);
   if (!project) return { error: { status: 404, message: "Project not found" } };
@@ -697,36 +703,17 @@ async function resolvePhotoDownload(
   );
   if (!photo) return { error: { status: 404, message: "Photo not found" } };
 
-  const sourceUrl =
-    variant === "original"
-      ? photo.originalUrl || photo.url
-      : photo.url || photo.originalUrl;
-  if (!sourceUrl)
+  const resolved = resolvePhotoSelectionDownloadMeta(photo, variant);
+  if (!resolved)
     return { error: { status: 404, message: "Photo URL not found" } };
 
-  const rawBase =
-    sanitizeFilename(photo.originalName || photo.id || "photo") || "photo";
-  const base = rawBase.replace(/\.[^.]+$/, "") || "photo";
-  const ext = extensionFromMime(photo.mimeType);
-  const originalFileName = originalFileNameFromSource(
-    photo.originalName || photo.id || "photo",
-    "photo",
-    ext,
-  );
-  const fileName =
-    variant === "original" ? originalFileName : `${base}-optimized.webp`;
-
-  return {
-    sourceUrl,
-    fileName,
-    mimeType: photo.mimeType || "",
-  };
+  return resolved;
 }
 
 async function resolveSelectedPhotosDownload(
   user,
   projectId,
-  variant = "optimized",
+  variant = "original",
 ) {
   const project = await getStudioProject(user, projectId);
   if (!project) return { error: { status: 404, message: "Project not found" } };
@@ -743,34 +730,29 @@ async function resolveSelectedPhotosDownload(
   const nameCounts = new Map();
   const items = pickedPhotos
     .map((photo) => {
-      const sourceUrl =
-        variant === "original"
-          ? photo.originalUrl || photo.url
-          : photo.url || photo.originalUrl;
-      if (!sourceUrl) return null;
+      const resolved = resolvePhotoSelectionDownloadMeta(photo, variant);
+      if (!resolved) return null;
 
       const rawBase =
         sanitizeFilename(photo.originalName || photo.id || "photo") || "photo";
       const base = rawBase.replace(/\.[^.]+$/, "") || "photo";
       const ext = extensionFromMime(photo.mimeType);
-      const originalFileName = originalFileNameFromSource(
-        photo.originalName || photo.id || "photo",
-        "photo",
-        ext,
-      );
-      const key = `${base}|${variant}|${ext}`;
+      const key =
+        variant === "original"
+          ? `${resolved.fileName}|original|${ext}`
+          : `${base}|optimized|webp`;
       const count = nameCounts.get(key) || 0;
       nameCounts.set(key, count + 1);
       const suffix = count > 0 ? `-${count + 1}` : "";
       const fileName =
         variant === "original"
           ? suffix
-            ? originalFileName.replace(/(\.[a-z0-9]{1,8})$/i, `${suffix}$1`)
-            : originalFileName
+            ? resolved.fileName.replace(/(\.[a-z0-9]{1,8})$/i, `${suffix}$1`)
+            : resolved.fileName
           : `${base}${suffix}-optimized.webp`;
 
       return {
-        sourceUrl,
+        sourceUrl: resolved.sourceUrl,
         fileName,
       };
     })
@@ -782,7 +764,9 @@ async function resolveSelectedPhotosDownload(
     };
   }
 
-  const rawProjectName = sanitizeFilename(project.name || "selected-photos");
+  const rawProjectName = sanitizeDownloadFilename(
+    project.name || "selected-photos",
+  );
   const safeProjectName =
     rawProjectName.replace(/\.[^.]+$/, "") || "selected-photos";
   const zipFileName =
@@ -799,7 +783,7 @@ async function resolveSelectedPhotosDownload(
 async function buildSelectedPhotosDownloadArtifact(
   user,
   projectId,
-  variant = "optimized",
+  variant = "original",
   onProgress,
 ) {
   const resolved = await resolveSelectedPhotosDownload(

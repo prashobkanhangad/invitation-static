@@ -84,7 +84,7 @@ async function downloadPhotoSelectionPhoto(req, res) {
       req.headers.authorization,
     );
     const variant =
-      req.query?.variant === "original" ? "original" : "optimized";
+      req.query?.variant === "optimized" ? "optimized" : "original";
     const resolved =
       await publicProjectsService.resolvePublicPhotoSelectionDownload(
         req.params.shareToken,
@@ -237,7 +237,7 @@ async function downloadPhotoSelectionPhotoBySlug(req, res) {
       req.headers.authorization,
     );
     const variant =
-      req.query?.variant === "original" ? "original" : "optimized";
+      req.query?.variant === "optimized" ? "optimized" : "original";
     const resolved =
       await publicProjectsService.resolvePublicPhotoSelectionDownloadBySlug(
         req.params.slug,

@@ -206,7 +206,7 @@ async function deletePhoto(req, res) {
 async function downloadPhoto(req, res) {
   try {
     const variant =
-      req.query?.variant === "original" ? "original" : "optimized";
+      req.query?.variant === "optimized" ? "optimized" : "original";
     const resolved = await studioPhotoSelectionService.resolvePhotoDownload(
       req.user,
       req.params.projectId,
@@ -243,7 +243,7 @@ async function downloadPhoto(req, res) {
 async function downloadSelectedPhotos(req, res) {
   try {
     const variant =
-      req.query?.variant === "original" ? "original" : "optimized";
+      req.query?.variant === "optimized" ? "optimized" : "original";
     const job = await uploadJobsService.createUploadJob(
       req.user.id,
       "photo_selection_download_selected",
