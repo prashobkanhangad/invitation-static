@@ -2,11 +2,13 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useParams } from "next/navigation";
-import PublicPhotoSelectionScreen from "@/components/client/PublicPhotoSelectionScreen";
+import PublicPhotoSelectionScreen, {
+  ALL_TAB_ID,
+  SELECTED_TAB_ID,
+} from "@/components/client/PublicPhotoSelectionScreen";
 import { apiFetch } from "@/utils/api";
 
 const PUBLIC_PHOTO_SELECTION_PAGE_LIMIT = 30;
-const ALL_TAB_ID = "__all__";
 
 type SelectionPhoto = {
   id: string;
@@ -147,8 +149,9 @@ export default function PublicPhotoSelectionPage() {
         setSelectionTabs(declaredTabs);
         if (mode === "replace") {
           setSelectionActiveTabId((prev) => {
-            if (prev !== ALL_TAB_ID && declaredTabs.some((tab) => tab.id === prev))
-              return prev;
+            if (prev === ALL_TAB_ID) return ALL_TAB_ID;
+            if (prev === SELECTED_TAB_ID) return SELECTED_TAB_ID;
+            if (declaredTabs.some((tab) => tab.id === prev)) return prev;
             return declaredTabs[0]!.id;
           });
         }
@@ -176,12 +179,9 @@ export default function PublicPhotoSelectionPage() {
           const firstInferredTabId =
             inferredIncomingTabIds.length > 0 ? inferredIncomingTabIds[0] : "";
           setSelectionActiveTabId((prev) => {
-            if (
-              prev !== ALL_TAB_ID &&
-              inferredIncomingTabIds.includes(String(prev))
-            ) {
-              return prev;
-            }
+            if (prev === ALL_TAB_ID) return ALL_TAB_ID;
+            if (prev === SELECTED_TAB_ID) return SELECTED_TAB_ID;
+            if (inferredIncomingTabIds.includes(String(prev))) return prev;
             return firstInferredTabId || ALL_TAB_ID;
           });
         }
@@ -218,8 +218,11 @@ export default function PublicPhotoSelectionPage() {
       const qs = new URLSearchParams();
       qs.set("limit", String(PUBLIC_PHOTO_SELECTION_PAGE_LIMIT));
       if (cursor) qs.set("cursor", cursor);
-      if (selectionActiveTabId !== ALL_TAB_ID)
+      if (selectionActiveTabId === SELECTED_TAB_ID) {
+        qs.set("tabId", SELECTED_TAB_ID);
+      } else if (selectionActiveTabId !== ALL_TAB_ID) {
         qs.set("tabId", selectionActiveTabId);
+      }
       return `/api/public/photos/${encodeURIComponent(slug || "")}?${qs.toString()}`;
     },
     [slug, selectionActiveTabId],
