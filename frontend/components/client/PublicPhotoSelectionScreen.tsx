@@ -83,6 +83,22 @@ function triggerDownload(url: string) {
   a.remove();
 }
 
+function formatBytes(bytes: number): string {
+  if (!Number.isFinite(bytes) || bytes <= 0) return "";
+  const units = ["B", "KB", "MB", "GB", "TB"];
+  let value = bytes;
+  let idx = 0;
+  while (value >= 1024 && idx < units.length - 1) {
+    value /= 1024;
+    idx += 1;
+  }
+  const rounded =
+    value >= 100 || idx === 0
+      ? Math.round(value)
+      : Math.round(value * 10) / 10;
+  return `${rounded} ${units[idx]}`;
+}
+
 export default function PublicPhotoSelectionScreen({
   subheading,
   loading,
@@ -116,8 +132,6 @@ export default function PublicPhotoSelectionScreen({
   const [gridFallbackToOriginalById, setGridFallbackToOriginalById] = useState<
     Record<string, boolean>
   >({});
-  const [lightboxFallbackToOriginal, setLightboxFallbackToOriginal] =
-    useState(false);
   const [pendingUnselectPhoto, setPendingUnselectPhoto] = useState<{
     id: string;
     label: string;
@@ -370,19 +384,6 @@ export default function PublicPhotoSelectionScreen({
     }
   };
 
-  function formatBytes(bytes: number): string {
-    if (!Number.isFinite(bytes) || bytes <= 0) return "";
-    const units = ["B", "KB", "MB", "GB", "TB"];
-    let value = bytes;
-    let idx = 0;
-    while (value >= 1024 && idx < units.length - 1) {
-      value /= 1024;
-      idx += 1;
-    }
-    const decimals = value >= 100 || idx === 0 ? 0 : value >= 10 ? 1 : 2;
-    return `${value.toFixed(decimals)} ${units[idx]}`;
-  }
-
   return (
     <main className="flex min-h-screen flex-col bg-[#f7f4ef] antialiased text-stone-900">
       <section className="border-b border-black/5 bg-gradient-to-b from-[#faf6ef] to-[#f7f4ef] px-3 pb-4 pt-5 sm:px-4 sm:pb-5 sm:pt-6 lg:px-5">
@@ -516,17 +517,17 @@ export default function PublicPhotoSelectionScreen({
                           <Image
                             src={
                               gridFallbackToOriginalById[photo.id]
-                                ? photo.url || photo.originalUrl || ""
+                                ? photo.originalUrl || photo.url || ""
                                 : photo.thumbUrl ||
-                                  photo.url ||
                                   photo.originalUrl ||
+                                  photo.url ||
                                   ""
                             }
                             alt={photo.label}
                             fill
                             sizes="(max-width: 768px) 50vw, 220px"
                             onError={() => {
-                              if (!photo.url && !photo.originalUrl) return;
+                              if (!photo.originalUrl && !photo.url) return;
                               setGridFallbackToOriginalById((prev) =>
                                 prev[photo.id]
                                   ? prev
@@ -714,7 +715,7 @@ export default function PublicPhotoSelectionScreen({
                       <span className="text-xs text-white/65">
                         {lightboxOriginalSizeLabel
                           ? `File size: ${lightboxOriginalSizeLabel}`
-                          : "Best quality, larger size"}
+                          : "Best quality, full size"}
                       </span>
                     </button>
                     <button
@@ -726,7 +727,7 @@ export default function PublicPhotoSelectionScreen({
                       <span className="text-xs text-white/65">
                         {lightboxOptimizedSizeLabel
                           ? `File size: ${lightboxOptimizedSizeLabel}`
-                          : "Smaller web-friendly lite"}
+                          : "Smaller web-friendly preview"}
                       </span>
                     </button>
                   </div>
@@ -745,17 +746,11 @@ export default function PublicPhotoSelectionScreen({
               <div className="relative h-[70vh] w-full">
                 <Image
                   src={
-                    lightboxFallbackToOriginal
-                      ? lightboxPhoto.originalUrl || lightboxPhoto.url || ""
-                      : lightboxPhoto.url || lightboxPhoto.originalUrl || ""
+                    lightboxPhoto.originalUrl || lightboxPhoto.url || ""
                   }
                   alt={lightboxPhoto.label}
                   fill
                   sizes="100vw"
-                  onError={() => {
-                    if (!lightboxPhoto?.originalUrl) return;
-                    setLightboxFallbackToOriginal(true);
-                  }}
                   className="object-contain"
                 />
               </div>

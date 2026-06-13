@@ -1,6 +1,7 @@
 const Album = require("../models/Album");
 const Project = require("../models/Project");
 const photoSelectionPin = require("./photoSelectionPin");
+const { resolvePhotoSelectionDownloadMeta } = require("./photoSelectionDownloadResolve");
 
 const DEFAULT_PUBLIC_PHOTO_SELECTION_LIMIT = 30;
 const MAX_PUBLIC_PHOTO_SELECTION_LIMIT = 120;
@@ -473,7 +474,7 @@ async function updatePublicPhotoSelectionPhotoBySlug(
 async function resolvePublicPhotoSelectionDownloadBySlug(
   rawSlug,
   photoId,
-  variant = "optimized",
+  variant = "original",
   accessToken,
 ) {
   const slug = normalizeSlug(rawSlug);
@@ -493,30 +494,11 @@ async function resolvePublicPhotoSelectionDownloadBySlug(
   );
   if (!photo) return { error: { status: 404, message: "Photo not found" } };
 
-  const sourceUrl =
-    variant === "original"
-      ? photo.originalUrl || photo.url
-      : photo.url || photo.originalUrl;
-  if (!sourceUrl)
+  const resolved = resolvePhotoSelectionDownloadMeta(photo, variant);
+  if (!resolved)
     return { error: { status: 404, message: "Photo URL not found" } };
 
-  const rawBase =
-    sanitizeFilename(photo.originalName || photo.id || "photo") || "photo";
-  const base = rawBase.replace(/\.[^.]+$/, "") || "photo";
-  const ext = extensionFromMime(photo.mimeType);
-  const originalFileName = originalFileNameFromSource(
-    photo.originalName || photo.id || "photo",
-    "photo",
-    ext,
-  );
-  const fileName =
-    variant === "original" ? originalFileName : `${base}-optimized.webp`;
-
-  return {
-    sourceUrl,
-    fileName,
-    mimeType: photo.mimeType || "",
-  };
+  return resolved;
 }
 
 async function resolvePublicAlbumImageDownload(
@@ -546,7 +528,7 @@ async function resolvePublicAlbumImageDownloadBySlug(
 async function resolvePublicPhotoSelectionDownload(
   shareToken,
   photoId,
-  variant = "optimized",
+  variant = "original",
   accessToken,
 ) {
   if (!shareToken)
@@ -566,30 +548,11 @@ async function resolvePublicPhotoSelectionDownload(
   );
   if (!photo) return { error: { status: 404, message: "Photo not found" } };
 
-  const sourceUrl =
-    variant === "original"
-      ? photo.originalUrl || photo.url
-      : photo.url || photo.originalUrl;
-  if (!sourceUrl)
+  const resolved = resolvePhotoSelectionDownloadMeta(photo, variant);
+  if (!resolved)
     return { error: { status: 404, message: "Photo URL not found" } };
 
-  const rawBase =
-    sanitizeFilename(photo.originalName || photo.id || "photo") || "photo";
-  const base = rawBase.replace(/\.[^.]+$/, "") || "photo";
-  const ext = extensionFromMime(photo.mimeType);
-  const originalFileName = originalFileNameFromSource(
-    photo.originalName || photo.id || "photo",
-    "photo",
-    ext,
-  );
-  const fileName =
-    variant === "original" ? originalFileName : `${base}-optimized.webp`;
-
-  return {
-    sourceUrl,
-    fileName,
-    mimeType: photo.mimeType || "",
-  };
+  return resolved;
 }
 
 async function verifyPhotoSelectionPinBySlug(rawSlug, plainPin) {

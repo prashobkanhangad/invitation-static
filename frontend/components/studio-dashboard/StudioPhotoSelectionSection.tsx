@@ -180,7 +180,7 @@ export default function StudioPhotoSelectionSection() {
           tabId: (typeof ph.tabId === "string" ? ph.tabId : null) as
             | string
             | null,
-          blobUrl: String(ph.url || ""),
+          blobUrl: String(ph.thumbUrl || ph.url || ""),
           originalUrl:
             typeof ph.originalUrl === "string" && ph.originalUrl
               ? ph.originalUrl
@@ -925,7 +925,7 @@ export default function StudioPhotoSelectionSection() {
           tabId: (typeof ph.tabId === "string" ? ph.tabId : null) as
             | string
             | null,
-          blobUrl: String(ph.url || ""),
+          blobUrl: String(ph.thumbUrl || ph.url || ""),
           originalUrl:
             typeof ph.originalUrl === "string" && ph.originalUrl
               ? ph.originalUrl
@@ -1228,6 +1228,7 @@ export default function StudioPhotoSelectionSection() {
       );
       window.alert(e instanceof Error ? e.message : "Download failed");
     } finally {
+      setSelectedDownloadMenuOpen(false);
       setSelectedDownloadBusy(null);
     }
   };
@@ -2377,9 +2378,13 @@ export default function StudioPhotoSelectionSection() {
                 </button>
               </div>
               <div className="overflow-hidden rounded-2xl bg-black ring-1 ring-white/15">
-                {studioPreviewPhoto.blobUrl ? (
+                {studioPreviewPhoto.originalUrl || studioPreviewPhoto.blobUrl ? (
                   <img
-                    src={studioPreviewPhoto.blobUrl}
+                    src={
+                      studioPreviewPhoto.originalUrl ||
+                      studioPreviewPhoto.blobUrl ||
+                      ""
+                    }
                     alt=""
                     className="mx-auto max-h-[85vh] w-auto max-w-full object-contain"
                   />
