@@ -52,6 +52,7 @@ async function ensureSlugForPublishedPhotoSelection(project) {
 }
 const {
   uploadImageVariantsByProvider,
+  uploadImageVariantsFromDirectStaging,
   downloadObjectBuffer,
   deleteObjectAtKey,
   createDirectUploadWriteUrl,
@@ -62,6 +63,26 @@ const { getActiveStorageProvider } = require("./storageSettings");
 
 const MAX_DIRECT_FILE_BYTES = 100 * 1024 * 1024;
 const MAX_DIRECT_FILES_PER_BATCH = 120;
+const COMMIT_CONCURRENCY = Math.min(
+  8,
+  Math.max(1, Number(process.env.PHOTO_COMMIT_CONCURRENCY) || 4),
+);
+
+async function poolMap(items, concurrency, worker) {
+  const results = new Array(items.length);
+  let nextIndex = 0;
+  async function run() {
+    while (true) {
+      const i = nextIndex;
+      nextIndex += 1;
+      if (i >= items.length) break;
+      results[i] = await worker(items[i], i);
+    }
+  }
+  const workers = Math.min(concurrency, Math.max(1, items.length));
+  await Promise.all(Array.from({ length: workers }, () => run()));
+  return results;
+}
 
 async function getStudioProject(user, projectId) {
   const q = studioProjectQuery(user, projectId);
@@ -74,6 +95,22 @@ function studioProjectQuery(user, projectId) {
   const q = { _id: projectId };
   if (user.role === "studio") q.studioUser = user.id;
   return q;
+}
+
+/** Atomically append photos — avoids VersionError when the project changes during long uploads. */
+async function appendPhotoSelectionPhotos(user, projectId, newPhotos) {
+  const q = studioProjectQuery(user, projectId);
+  if (!q) return { error: { status: 404, message: "Project not found" } };
+  if (!Array.isArray(newPhotos) || newPhotos.length === 0) {
+    return { error: { status: 400, message: "No photos to append" } };
+  }
+  const updated = await Project.findOneAndUpdate(
+    q,
+    { $push: { "photoSelection.photos": { $each: newPhotos } } },
+    { new: true },
+  );
+  if (!updated) return { error: { status: 404, message: "Project not found" } };
+  return { project: updated };
 }
 
 function isTruthyPinEnabled(v) {
@@ -247,11 +284,8 @@ async function uploadPhotos(user, projectId, files, payload, req) {
       fav: false,
     });
   }
-  project.photoSelection.photos = [
-    ...(project.photoSelection.photos || []),
-    ...next,
-  ];
-  await project.save();
+  const appendResult = await appendPhotoSelectionPhotos(user, projectId, next);
+  if (appendResult.error) return appendResult;
   return { photos: next };
 }
 
@@ -355,6 +389,7 @@ async function commitPhotoDirectUploads(
     typeof payload?.tabId === "string" && payload.tabId ? payload.tabId : null;
 
   const next = [];
+  let progressDone = 0;
   if (onProgress)
     await onProgress({
       total: items.length,
@@ -362,76 +397,91 @@ async function commitPhotoDirectUploads(
       message: "Processing photos",
     });
 
-  for (let i = 0; i < items.length; i += 1) {
-    const item = items[i];
-    const key = typeof item?.key === "string" ? item.key : "";
-    const originalName =
-      typeof item?.originalName === "string" ? item.originalName : "image.jpg";
-    const mimeType =
-      typeof item?.mimeType === "string" ? item.mimeType : "image/jpeg";
-    const tabId =
-      typeof item?.tabId === "string" && item.tabId ? item.tabId : defaultTabId;
-
-    if (!key || !key.startsWith(`${expectedPrefix}/`)) {
-      return { error: { status: 400, message: "Invalid storage key" } };
-    }
-
-    let buffer;
-    try {
-      buffer = await downloadObjectBuffer({ key, provider });
-    } catch (e) {
-      return {
-        error: {
-          status: 400,
-          message: `Could not read uploaded file: ${originalName}`,
-        },
-      };
-    }
-
-    try {
-      await sharp(buffer).metadata();
-    } catch {
-      await deleteObjectAtKey({ key, provider }).catch(() => {});
-      return {
-        error: { status: 400, message: `Not a valid image: ${originalName}` },
-      };
-    }
-
-    const file = { buffer, originalname: originalName, mimetype: mimeType };
-    const { originalUrl, displayUrl, thumbUrl } =
-      await uploadImageVariantsByProvider({
-        file,
-        folder,
-        provider,
-      });
-
-    await deleteObjectAtKey({ key, provider }).catch(() => {});
-
-    next.push({
-      id: `ps_${Date.now()}_${Math.random().toString(16).slice(2)}`,
-      url: displayUrl,
-      originalUrl,
-      thumbUrl,
-      originalName,
-      mimeType,
-      byteSize: toValidByteSize(item?.byteSize || buffer?.length),
-      tabId,
-      picked: false,
-      fav: false,
+  const reportProgress = async () => {
+    if (!onProgress) return;
+    await onProgress({
+      total: items.length,
+      done: progressDone,
+      message: `Processed ${progressDone}/${items.length}`,
     });
-    if (onProgress)
-      await onProgress({
-        total: items.length,
-        done: i + 1,
-        message: `Processed ${i + 1}/${items.length}`,
-      });
+  };
+
+  try {
+    const processed = await poolMap(items, COMMIT_CONCURRENCY, async (item) => {
+      const key = typeof item?.key === "string" ? item.key : "";
+      const originalName =
+        typeof item?.originalName === "string" ? item.originalName : "image.jpg";
+      const mimeType =
+        typeof item?.mimeType === "string" ? item.mimeType : "image/jpeg";
+      const tabId =
+        typeof item?.tabId === "string" && item.tabId ? item.tabId : defaultTabId;
+
+      if (!key || !key.startsWith(`${expectedPrefix}/`)) {
+        throw Object.assign(new Error("Invalid storage key"), {
+          status: 400,
+        });
+      }
+
+      let buffer;
+      try {
+        buffer = await downloadObjectBuffer({ key, provider });
+      } catch {
+        throw Object.assign(
+          new Error(`Could not read uploaded file: ${originalName}`),
+          { status: 400 },
+        );
+      }
+
+      const file = { buffer, originalname: originalName, mimetype: mimeType };
+      let originalUrl;
+      let displayUrl;
+      let thumbUrl;
+      try {
+        ({ originalUrl, displayUrl, thumbUrl } =
+          await uploadImageVariantsFromDirectStaging({
+            buffer,
+            stagingKey: key,
+            file,
+            folder,
+            provider,
+          }));
+      } catch {
+        await deleteObjectAtKey({ key, provider }).catch(() => {});
+        throw Object.assign(new Error(`Not a valid image: ${originalName}`), {
+          status: 400,
+        });
+      }
+
+      await deleteObjectAtKey({ key, provider }).catch(() => {});
+
+      progressDone += 1;
+      await reportProgress();
+
+      return {
+        id: `ps_${Date.now()}_${Math.random().toString(16).slice(2)}`,
+        url: displayUrl,
+        originalUrl,
+        thumbUrl,
+        originalName,
+        mimeType,
+        byteSize: toValidByteSize(item?.byteSize || buffer?.length),
+        tabId,
+        picked: false,
+        fav: false,
+      };
+    });
+    next.push(...processed);
+  } catch (err) {
+    return {
+      error: {
+        status: err.status || 500,
+        message: err.message || "Photo processing failed",
+      },
+    };
   }
 
-  project.photoSelection.photos = [
-    ...(project.photoSelection.photos || []),
-    ...next,
-  ];
-  await project.save();
+  const appendResult = await appendPhotoSelectionPhotos(user, projectId, next);
+  if (appendResult.error) return appendResult;
   return { photos: next };
 }
 
