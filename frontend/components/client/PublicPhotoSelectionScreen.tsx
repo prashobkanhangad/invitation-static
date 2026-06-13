@@ -62,7 +62,8 @@ type Props = {
   onSelectedCountDelta?: (delta: number) => void;
 };
 
-const ALL_TAB_ID = "__all__";
+export const ALL_TAB_ID = "__all__";
+export const SELECTED_TAB_ID = "__selected__";
 
 const shimmerBar =
   "bg-gradient-to-r from-stone-200 via-stone-50 to-stone-200 bg-[length:200%_100%] animate-shimmer";
@@ -117,6 +118,11 @@ export default function PublicPhotoSelectionScreen({
   >({});
   const [lightboxFallbackToOriginal, setLightboxFallbackToOriginal] =
     useState(false);
+  const [pendingUnselectPhoto, setPendingUnselectPhoto] = useState<{
+    id: string;
+    label: string;
+  } | null>(null);
+  const [unselectConfirmBusy, setUnselectConfirmBusy] = useState(false);
   const loadMoreSentinelRef = useRef<HTMLDivElement | null>(null);
   const loadMoreBusyRef = useRef(false);
   const loadingMoreRef = useRef(loadingMorePhotos);
@@ -145,7 +151,12 @@ export default function PublicPhotoSelectionScreen({
     setGridFallbackToOriginalById({});
   }, [photos]);
 
-  const photosForActiveTab = photos;
+  const photosForActiveTab = useMemo(() => {
+    if (activeTabId === SELECTED_TAB_ID) {
+      return photos.filter((photo) => selectedById[photo.id]);
+    }
+    return photos;
+  }, [photos, activeTabId, selectedById]);
 
   useEffect(() => {
     loadingMoreRef.current = loadingMorePhotos;
@@ -271,8 +282,7 @@ export default function PublicPhotoSelectionScreen({
     return () => controller.abort();
   }, [lightboxPhoto, publicLookup, accessToken]);
 
-  const toggleSelected = (photoId: string) => {
-    const nextPicked = !selectedById[photoId];
+  const applySelected = (photoId: string, nextPicked: boolean) => {
     const delta = nextPicked ? 1 : -1;
     setSelectedById((prev) => ({ ...prev, [photoId]: nextPicked }));
     onSelectedCountDelta?.(delta);
@@ -285,6 +295,34 @@ export default function PublicPhotoSelectionScreen({
       onSelectedCountDelta?.(-delta);
       window.alert("Failed to save selection. Please try again.");
     });
+  };
+
+  const toggleSelected = (photoId: string) => {
+    const currentlyPicked = Boolean(selectedById[photoId]);
+    if (!currentlyPicked) {
+      applySelected(photoId, true);
+      return;
+    }
+    if (activeTabId === SELECTED_TAB_ID) {
+      const photo = photos.find((p) => p.id === photoId);
+      setPendingUnselectPhoto({
+        id: photoId,
+        label: photo?.label || "this photo",
+      });
+      return;
+    }
+    applySelected(photoId, false);
+  };
+
+  const confirmUnselectPhoto = () => {
+    if (!pendingUnselectPhoto || unselectConfirmBusy) return;
+    setUnselectConfirmBusy(true);
+    try {
+      applySelected(pendingUnselectPhoto.id, false);
+      setPendingUnselectPhoto(null);
+    } finally {
+      setUnselectConfirmBusy(false);
+    }
   };
 
   const toggleFav = (photoId: string) => {
@@ -441,11 +479,25 @@ export default function PublicPhotoSelectionScreen({
                 >
                   All photos
                 </button>
+                <button
+                  type="button"
+                  onClick={() => onTabChange(SELECTED_TAB_ID)}
+                  className={[
+                    "shrink-0 rounded-full px-4 py-2 text-sm font-semibold transition",
+                    activeTabId === SELECTED_TAB_ID
+                      ? "bg-stone-900 text-white"
+                      : "bg-white text-stone-700 ring-1 ring-stone-200 hover:bg-stone-50",
+                  ].join(" ")}
+                >
+                  Selected
+                </button>
               </div>
 
               {photosForActiveTab.length === 0 && !hasMorePhotos ? (
                 <div className="rounded-2xl border border-dashed border-stone-300 bg-white/80 p-8 text-center text-sm text-stone-600">
-                  No photos in this section yet.
+                  {activeTabId === SELECTED_TAB_ID
+                    ? "No selected photos yet. Tap Select on any photo to add it here."
+                    : "No photos in this section yet."}
                 </div>
               ) : (
                 <>
@@ -707,6 +759,57 @@ export default function PublicPhotoSelectionScreen({
                   className="object-contain"
                 />
               </div>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {pendingUnselectPhoto ? (
+        <div className="fixed inset-0 z-[60] flex items-end justify-center sm:items-center sm:p-4">
+          <button
+            type="button"
+            aria-label="Close"
+            className="absolute inset-0 bg-black/45"
+            onClick={() => {
+              if (unselectConfirmBusy) return;
+              setPendingUnselectPhoto(null);
+            }}
+          />
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="unselect-photo-title"
+            className="relative w-full max-w-md rounded-t-3xl border border-stone-200 bg-white p-5 shadow-2xl sm:rounded-3xl"
+          >
+            <p
+              id="unselect-photo-title"
+              className="text-base font-semibold text-stone-900"
+            >
+              Remove from selected?
+            </p>
+            <p className="mt-2 text-sm text-stone-600">
+              <span className="font-medium text-stone-800">
+                {pendingUnselectPhoto.label}
+              </span>{" "}
+              will be unselected.
+            </p>
+            <div className="mt-5 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+              <button
+                type="button"
+                onClick={() => setPendingUnselectPhoto(null)}
+                disabled={unselectConfirmBusy}
+                className="inline-flex h-11 items-center justify-center rounded-xl border border-stone-200 bg-white px-4 text-sm font-semibold text-stone-700 hover:bg-stone-50 disabled:opacity-60"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={confirmUnselectPhoto}
+                disabled={unselectConfirmBusy}
+                className="inline-flex h-11 items-center justify-center rounded-xl bg-stone-900 px-4 text-sm font-semibold text-white hover:bg-stone-800 disabled:opacity-60"
+              >
+                {unselectConfirmBusy ? "Removing..." : "Yes, unselect"}
+              </button>
             </div>
           </div>
         </div>

@@ -3,7 +3,10 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useParams } from "next/navigation";
 import PublicAlbumScreen from "@/components/client/PublicAlbumScreen";
-import PublicPhotoSelectionScreen from "@/components/client/PublicPhotoSelectionScreen";
+import PublicPhotoSelectionScreen, {
+  ALL_TAB_ID,
+  SELECTED_TAB_ID,
+} from "@/components/client/PublicPhotoSelectionScreen";
 import { apiFetch } from "@/utils/api";
 import type { DigitalAlbumTemplatePreviewConfig } from "@/utils/digitalAlbumTemplates";
 import { DEFAULT_DIGITAL_ALBUM_TEMPLATE_ID } from "@/utils/digitalAlbumTemplates";
@@ -15,7 +18,6 @@ import type {
 } from "@/components/client/PublicAlbumScreen";
 
 const PUBLIC_PHOTO_SELECTION_PAGE_LIMIT = 30;
-const ALL_TAB_ID = "__all__";
 
 type SelectionPhoto = {
   id: string;
@@ -154,8 +156,11 @@ export default function ShareAlbumPage() {
       const qs = new URLSearchParams();
       qs.set("limit", String(PUBLIC_PHOTO_SELECTION_PAGE_LIMIT));
       if (cursor) qs.set("cursor", cursor);
-      if (selectionActiveTabId !== ALL_TAB_ID)
+      if (selectionActiveTabId === SELECTED_TAB_ID) {
+        qs.set("tabId", SELECTED_TAB_ID);
+      } else if (selectionActiveTabId !== ALL_TAB_ID) {
         qs.set("tabId", selectionActiveTabId);
+      }
       return `/api/public/projects/${encodeURIComponent(shareToken || "")}?${qs.toString()}`;
     },
     [shareToken, selectionActiveTabId],
@@ -210,8 +215,9 @@ export default function ShareAlbumPage() {
         setSelectionTabs(declaredTabs);
         if (mode === "replace") {
           setSelectionActiveTabId((prev) => {
-            if (prev !== ALL_TAB_ID && declaredTabs.some((tab) => tab.id === prev))
-              return prev;
+            if (prev === ALL_TAB_ID) return ALL_TAB_ID;
+            if (prev === SELECTED_TAB_ID) return SELECTED_TAB_ID;
+            if (declaredTabs.some((tab) => tab.id === prev)) return prev;
             return declaredTabs[0]!.id;
           });
         }
@@ -239,12 +245,9 @@ export default function ShareAlbumPage() {
           const firstInferredTabId =
             inferredIncomingTabIds.length > 0 ? inferredIncomingTabIds[0] : "";
           setSelectionActiveTabId((prev) => {
-            if (
-              prev !== ALL_TAB_ID &&
-              inferredIncomingTabIds.includes(String(prev))
-            ) {
-              return prev;
-            }
+            if (prev === ALL_TAB_ID) return ALL_TAB_ID;
+            if (prev === SELECTED_TAB_ID) return SELECTED_TAB_ID;
+            if (inferredIncomingTabIds.includes(String(prev))) return prev;
             return firstInferredTabId || ALL_TAB_ID;
           });
         }

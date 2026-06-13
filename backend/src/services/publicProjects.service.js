@@ -63,15 +63,18 @@ function buildPublicPhotoSelectionPage(project, paginationInput) {
   const rawPhotos = Array.isArray(rawSelection.photos)
     ? rawSelection.photos
     : [];
-  const tabId =
+  const tabIdRaw =
     typeof paginationInput?.tabId === "string" &&
     paginationInput.tabId.trim() &&
     paginationInput.tabId !== "__all__"
       ? paginationInput.tabId.trim()
       : null;
-  const allPhotos = tabId
-    ? rawPhotos.filter((photo) => String(photo?.tabId || "") === tabId)
-    : rawPhotos;
+  const allPhotos =
+    tabIdRaw === "__selected__"
+      ? rawPhotos.filter((photo) => Boolean(photo?.picked))
+      : tabIdRaw
+        ? rawPhotos.filter((photo) => String(photo?.tabId || "") === tabIdRaw)
+        : rawPhotos;
   const limit = normalizePublicPhotoSelectionLimit(paginationInput?.limit);
   const requestedOffset = normalizePublicPhotoSelectionOffset(
     paginationInput?.cursor,
