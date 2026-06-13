@@ -248,7 +248,6 @@ export default function PublicPhotoSelectionScreen({
     : null;
   useEffect(() => {
     if (!lightboxPhoto) setDownloadMenuOpen(false);
-    setLightboxFallbackToOriginal(false);
   }, [lightboxPhoto]);
 
   useEffect(() => {
