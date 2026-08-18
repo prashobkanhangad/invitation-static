@@ -796,7 +796,12 @@ async function buildSelectedPhotosDownloadArtifact(
   const tmpDir = await fs.promises.mkdtemp(path.join(os.tmpdir(), "psdl-"));
   const zipPath = path.join(tmpDir, resolved.zipFileName);
   const output = fs.createWriteStream(zipPath);
-  const archive = archiver("zip", { zlib: { level: 9 } });
+  // Level 1: originals (JPEG/PNG) barely compress; high levels only slow the zip.
+  const archive = archiver("zip", { zlib: { level: 1 } });
+  const downloadConcurrency = Math.min(
+    8,
+    Math.max(1, Number(process.env.PHOTO_DOWNLOAD_CONCURRENCY) || 6),
+  );
 
   await new Promise((resolve, reject) => {
     output.on("close", resolve);
@@ -813,7 +818,9 @@ async function buildSelectedPhotosDownloadArtifact(
         });
       }
       let done = 0;
-      for (const item of resolved.items) {
+      let nextIndex = 0;
+
+      async function fetchAndAppend(item) {
         try {
           const upstream = await fetch(item.sourceUrl);
           if (upstream.ok) {
@@ -831,6 +838,21 @@ async function buildSelectedPhotosDownloadArtifact(
           }
         }
       }
+
+      async function worker() {
+        while (true) {
+          const i = nextIndex;
+          nextIndex += 1;
+          if (i >= resolved.items.length) break;
+          await fetchAndAppend(resolved.items[i]);
+        }
+      }
+
+      const workers = Math.min(
+        downloadConcurrency,
+        Math.max(1, resolved.items.length),
+      );
+      await Promise.all(Array.from({ length: workers }, () => worker()));
       await archive.finalize();
     })().catch(reject);
   });
