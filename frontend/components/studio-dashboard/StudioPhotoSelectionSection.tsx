@@ -47,7 +47,8 @@ const STUDIO_TABLE_SHIMMER =
   "bg-gradient-to-r from-zinc-200 via-zinc-50 to-zinc-200 bg-[length:200%_100%] animate-shimmer";
 const WORKSPACE_PHOTO_PAGE_SIZE = 60;
 const DOWNLOAD_JOB_POLL_MS = 1500;
-const DOWNLOAD_JOB_TIMEOUT_MS = 20 * 60 * 1000;
+/** Large original zips (hundreds of photos) can take 30–60+ minutes. */
+const DOWNLOAD_JOB_TIMEOUT_MS = 90 * 60 * 1000;
 
 type SelectionRoundBadge = { label: string; tone: "good" | "warn" | "neutral" };
 
