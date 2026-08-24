@@ -188,11 +188,36 @@ async function createProject(user, payload) {
 }
 
 async function listProjects(user) {
-  const q = user.role === "studio" ? { studioUser: user.id } : {};
-  const projects = await Project.find(q).sort({ updatedAt: -1 });
-  for (const project of projects) {
-    await ensureSlugForPublishedPhotoSelection(project);
-  }
+  const q =
+    user.role === "studio"
+      ? { studioUser: new mongoose.Types.ObjectId(user.id) }
+      : {};
+  // List view only — do not load photoSelection.photos (can be huge).
+  const projects = await Project.aggregate([
+    { $match: q },
+    { $sort: { updatedAt: -1 } },
+    {
+      $project: {
+        name: 1,
+        slug: 1,
+        shareToken: 1,
+        isPublished: 1,
+        updatedAt: 1,
+        createdAt: 1,
+        photoSelection: {
+          published: "$photoSelection.published",
+          publishedAt: "$photoSelection.publishedAt",
+          goal: "$photoSelection.goal",
+          clientTabs: "$photoSelection.clientTabs",
+          pinEnabled: "$photoSelection.pinEnabled",
+          ogImage: "$photoSelection.ogImage",
+        },
+        photoCount: {
+          $size: { $ifNull: ["$photoSelection.photos", []] },
+        },
+      },
+    },
+  ]);
   return { projects };
 }
 

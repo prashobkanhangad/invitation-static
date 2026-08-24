@@ -213,6 +213,12 @@ export default function StudioPhotoSelectionSection() {
             label: String(ogRaw.originalName || "OG image"),
           }
         : null;
+    const listedCount = Number(p?.photoCount);
+    const photoCount = photos.length
+      ? photos.length
+      : Number.isFinite(listedCount)
+        ? listedCount
+        : 0;
     return {
       id: String(p?._id ?? p?.id ?? ""),
       name: String(p?.name ?? "Untitled project"),
@@ -227,13 +233,41 @@ export default function StudioPhotoSelectionSection() {
       slug: typeof p?.slug === "string" && p.slug ? p.slug : null,
       pinEnabled: Boolean(p?.photoSelection?.pinEnabled),
       stats: {
-        uploadedLabel: String(photos.length),
-        visibleToClient: photos.length,
+        uploadedLabel: String(photoCount),
+        visibleToClient: photoCount,
         hidden: 0,
       },
       ogImage,
       photos,
     };
+  };
+
+  const openProject = async (projectId: string) => {
+    const existing = projects.find((p) => p.id === projectId);
+    // List endpoint omits photos — load full project when opening workspace.
+    if (existing && existing.photos.length > 0) {
+      setActiveProjectId(projectId);
+      return;
+    }
+    const listedCount = Number(existing?.stats.uploadedLabel || 0);
+    if (existing && listedCount === 0) {
+      setActiveProjectId(projectId);
+      return;
+    }
+    try {
+      const data = await studioApiFetch<{ project: any }>(
+        `/api/studio/photo-selection/projects/${encodeURIComponent(projectId)}`,
+      );
+      const mapped = mapApiProjectToUi(data.project);
+      setProjects((prev) =>
+        prev.map((p) => (p.id === projectId ? mapped : p)),
+      );
+      setActiveProjectId(projectId);
+    } catch (e) {
+      window.alert(
+        e instanceof Error ? e.message : "Failed to open project",
+      );
+    }
   };
 
   useEffect(() => {
@@ -2704,7 +2738,7 @@ export default function StudioPhotoSelectionSection() {
                       <td className="px-5 py-3 text-right">
                         <button
                           type="button"
-                          onClick={() => setActiveProjectId(proj.id)}
+                          onClick={() => void openProject(proj.id)}
                           className="inline-flex items-center gap-1 rounded-lg px-2 py-1.5 text-sm font-semibold text-zinc-900 hover:bg-zinc-100"
                         >
                           Open

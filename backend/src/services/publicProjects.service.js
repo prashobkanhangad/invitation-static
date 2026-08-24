@@ -104,6 +104,176 @@ function buildPublicPhotoSelectionPage(project, paginationInput) {
   };
 }
 
+/** Mongo-side page of photos so Atlas → Node does not transfer the full array. */
+async function loadPublicPhotoSelectionPaged(
+  match,
+  accessToken,
+  paginationInput,
+) {
+  const limit = normalizePublicPhotoSelectionLimit(paginationInput?.limit);
+  const offset = normalizePublicPhotoSelectionOffset(paginationInput?.cursor);
+  const tabIdRaw =
+    typeof paginationInput?.tabId === "string" &&
+    paginationInput.tabId.trim() &&
+    paginationInput.tabId !== "__all__"
+      ? paginationInput.tabId.trim()
+      : null;
+
+  let filteredPhotosExpr;
+  if (tabIdRaw === "__selected__") {
+    filteredPhotosExpr = {
+      $filter: {
+        input: { $ifNull: ["$photoSelection.photos", []] },
+        as: "p",
+        cond: { $eq: ["$$p.picked", true] },
+      },
+    };
+  } else if (tabIdRaw) {
+    filteredPhotosExpr = {
+      $filter: {
+        input: { $ifNull: ["$photoSelection.photos", []] },
+        as: "p",
+        cond: { $eq: ["$$p.tabId", tabIdRaw] },
+      },
+    };
+  } else {
+    filteredPhotosExpr = { $ifNull: ["$photoSelection.photos", []] };
+  }
+
+  const rows = await Project.aggregate([
+    { $match: match },
+    { $limit: 1 },
+    {
+      $lookup: {
+        from: "users",
+        localField: "studioUser",
+        foreignField: "_id",
+        as: "_studio",
+        pipeline: [{ $project: { studioName: 1, name: 1 } }],
+      },
+    },
+    {
+      $addFields: {
+        _studioUser: { $arrayElemAt: ["$_studio", 0] },
+        _filteredPhotos: filteredPhotosExpr,
+      },
+    },
+    {
+      $addFields: {
+        _total: { $size: "$_filteredPhotos" },
+        _pagePhotos: { $slice: ["$_filteredPhotos", offset, limit] },
+      },
+    },
+    {
+      $project: {
+        name: 1,
+        slug: 1,
+        shareToken: 1,
+        templateId: 1,
+        studioUser: "$_studioUser",
+        photoSelection: {
+          published: "$photoSelection.published",
+          publishedAt: "$photoSelection.publishedAt",
+          goal: "$photoSelection.goal",
+          clientTabs: "$photoSelection.clientTabs",
+          pinEnabled: "$photoSelection.pinEnabled",
+          pinHash: "$photoSelection.pinHash",
+          ogImage: "$photoSelection.ogImage",
+          photos: "$_pagePhotos",
+        },
+        _total: 1,
+        _pageLen: { $size: "$_pagePhotos" },
+      },
+    },
+  ]);
+
+  const project = rows[0];
+  if (!project?.photoSelection) {
+    return { error: { status: 404, message: "Project not found" } };
+  }
+
+  const pinGate = photoSelectionPin.assertPhotoSelectionPinAccess(
+    project,
+    accessToken,
+  );
+  if (pinGate.error) return pinGate;
+
+  const total = Number(project._total) || 0;
+  const safeOffset = Math.min(Math.max(0, offset), total);
+  const pageLen = Number(project._pageLen) || 0;
+  const consumed = safeOffset + pageLen;
+  const hasMore = consumed < total;
+
+  const photoSelection = safePublicPhotoSelection(project);
+  if (photoSelection && Array.isArray(project.photoSelection.photos)) {
+    photoSelection.photos = project.photoSelection.photos;
+  }
+
+  return {
+    project: {
+      id: project._id,
+      name: project.name,
+      templateId: project.templateId,
+      shareToken: project.shareToken,
+      slug: project.slug,
+      studioName: publicStudioDisplayName(project),
+    },
+    template: null,
+    images: [],
+    photoSelection,
+    photoSelectionPage: {
+      cursor: String(safeOffset),
+      nextCursor: hasMore ? String(consumed) : null,
+      hasMore,
+      limit,
+      total,
+    },
+  };
+}
+
+async function loadPublicPhotoSelectionStats(match, accessToken) {
+  const rows = await Project.aggregate([
+    { $match: match },
+    { $limit: 1 },
+    {
+      $project: {
+        photoSelection: {
+          pinEnabled: "$photoSelection.pinEnabled",
+          pinHash: "$photoSelection.pinHash",
+        },
+        totalPhotos: {
+          $size: { $ifNull: ["$photoSelection.photos", []] },
+        },
+        selectedPhotos: {
+          $size: {
+            $filter: {
+              input: { $ifNull: ["$photoSelection.photos", []] },
+              as: "p",
+              cond: { $eq: ["$$p.picked", true] },
+            },
+          },
+        },
+      },
+    },
+  ]);
+
+  const project = rows[0];
+  if (!project) return { error: { status: 404, message: "Project not found" } };
+
+  const pinGate = photoSelectionPin.assertPhotoSelectionPinAccess(
+    { _id: project._id, photoSelection: project.photoSelection },
+    accessToken,
+  );
+  if (pinGate.error) return pinGate;
+
+  return {
+    photoSelectionStats: {
+      totalPhotos: Number(project.totalPhotos) || 0,
+      selectedPhotos: Number(project.selectedPhotos) || 0,
+    },
+  };
+}
+
 function buildPublicPhotoSelectionStats(project) {
   const photos = Array.isArray(project?.photoSelection?.photos)
     ? project.photoSelection.photos
@@ -204,6 +374,20 @@ async function getPublicProjectByShareToken(
   );
   if (album) return mapAlbumResponse(album);
 
+  const photoSelStub = await Project.findOne({
+    shareToken,
+    isPublished: true,
+  })
+    .select({ "photoSelection.published": 1 })
+    .lean();
+  if (photoSelStub?.photoSelection) {
+    return loadPublicPhotoSelectionPaged(
+      { shareToken, isPublished: true },
+      accessToken,
+      paginationInput,
+    );
+  }
+
   const project = await Project.findOne({ shareToken, isPublished: true })
     .populate("template")
     .populate("studioUser", "studioName name");
@@ -246,6 +430,17 @@ async function getPublicProjectBySlug(rawSlug, accessToken, paginationInput) {
     "studioName name",
   );
   if (album) return mapAlbumResponse(album);
+
+  const photoSelStub = await Project.findOne({ slug, isPublished: true })
+    .select({ "photoSelection.published": 1 })
+    .lean();
+  if (photoSelStub?.photoSelection) {
+    return loadPublicPhotoSelectionPaged(
+      { slug, isPublished: true },
+      accessToken,
+      paginationInput,
+    );
+  }
 
   const project = await Project.findOne({ slug, isPublished: true })
     .populate("template")
@@ -400,39 +595,11 @@ async function getPublicPhotoSelectionBySlug(
   const slug = normalizeSlug(rawSlug);
   if (!slug) return { error: { status: 400, message: "slug required" } };
 
-  const project = await Project.findOne({ slug, isPublished: true })
-    .populate("template")
-    .populate("studioUser", "studioName name");
-  if (!project?.photoSelection)
-    return { error: { status: 404, message: "Project not found" } };
-
-  const pinGate = photoSelectionPin.assertPhotoSelectionPinAccess(
-    project,
+  return loadPublicPhotoSelectionPaged(
+    { slug, isPublished: true },
     accessToken,
-  );
-  if (pinGate.error) return pinGate;
-  const { photoSelection, photoSelectionPage } = buildPublicPhotoSelectionPage(
-    project,
     paginationInput,
   );
-
-  return {
-    project: {
-      id: project._id,
-      name: project.name,
-      templateId: project.templateId,
-      slug: project.slug,
-      studioName: publicStudioDisplayName(project),
-    },
-    template: normalizeTemplate(project.template),
-    images: (project.images || []).map((img) => ({
-      id: img.id,
-      url: img.url,
-      originalUrl: img.originalUrl || "",
-    })),
-    photoSelection,
-    photoSelectionPage,
-  };
 }
 
 async function updatePublicPhotoSelectionPhotoBySlug(
@@ -614,15 +781,7 @@ async function verifyPhotoSelectionPinByShareToken(shareToken, plainPin) {
 async function getPublicPhotoSelectionStatsBySlug(rawSlug, accessToken) {
   const slug = normalizeSlug(rawSlug);
   if (!slug) return { error: { status: 400, message: "slug required" } };
-  const project = await Project.findOne({ slug, isPublished: true });
-  if (!project?.photoSelection)
-    return { error: { status: 404, message: "Project not found" } };
-  const pinGate = photoSelectionPin.assertPhotoSelectionPinAccess(
-    project,
-    accessToken,
-  );
-  if (pinGate.error) return pinGate;
-  return { photoSelectionStats: buildPublicPhotoSelectionStats(project) };
+  return loadPublicPhotoSelectionStats({ slug, isPublished: true }, accessToken);
 }
 
 async function getPublicPhotoSelectionStatsByShareToken(
@@ -631,15 +790,10 @@ async function getPublicPhotoSelectionStatsByShareToken(
 ) {
   if (!shareToken)
     return { error: { status: 400, message: "shareToken required" } };
-  const project = await Project.findOne({ shareToken, isPublished: true });
-  if (!project?.photoSelection)
-    return { error: { status: 404, message: "Project not found" } };
-  const pinGate = photoSelectionPin.assertPhotoSelectionPinAccess(
-    project,
+  return loadPublicPhotoSelectionStats(
+    { shareToken, isPublished: true },
     accessToken,
   );
-  if (pinGate.error) return pinGate;
-  return { photoSelectionStats: buildPublicPhotoSelectionStats(project) };
 }
 
 module.exports = {
