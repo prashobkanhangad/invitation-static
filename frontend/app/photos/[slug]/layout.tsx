@@ -75,6 +75,7 @@ export async function generateMetadata({ params }: LayoutProps): Promise<Metadat
       type: "website",
       ...(ogImageUrl ? { images: [{ url: ogImageUrl }] } : {}),
     },
+    robots: { index: false, follow: false },
     twitter: {
       card: "summary_large_image",
       title,

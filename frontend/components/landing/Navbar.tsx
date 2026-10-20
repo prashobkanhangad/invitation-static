@@ -1,14 +1,16 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import Link from "next/link";
 import { Menu, X } from "lucide-react";
 import { openWhatsApp } from "@/utils/whatsapp";
 
 const navLinks = [
-  { label: "Features", href: "#features" },
-  { label: "How It Works", href: "#how-it-works" },
-  // { label: "Pricing", href: "#pricing" },
-  { label: "Testimonials", href: "#testimonials" },
+  { label: "What's inside", href: "#features" },
+  { label: "How it works", href: "#how-it-works" },
+  { label: "Examples", href: "#live-examples" },
+  { label: "Pricing", href: "/pricing" },
+  { label: "FAQ", href: "#faq" },
 ];
 
 const Navbar = () => {
@@ -30,9 +32,12 @@ const Navbar = () => {
       }`}
     >
       <div className="container mx-auto flex items-center justify-between py-4 px-6">
-        <a href="/" className="font-display text-2xl font-semibold tracking-wide text-gradient-gold">
+        <Link
+          href="/"
+          className="font-display text-2xl font-semibold tracking-wide text-gradient-gold"
+        >
           Invyto
-        </a>
+        </Link>
 
         <div className="hidden md:flex items-center gap-8">
           {navLinks.map((l) => (
@@ -46,7 +51,11 @@ const Navbar = () => {
           ))}
           <button
             type="button"
-            onClick={() => openWhatsApp("Hi! I'd like to create a digital invitation.")}
+            onClick={() =>
+              openWhatsApp(
+                "Hi! I'd like to create a digital wedding invitation.",
+              )
+            }
             className="px-5 py-2 rounded-full bg-primary text-primary-foreground text-sm font-semibold hover:brightness-110 transition"
           >
             Get Started
@@ -79,7 +88,9 @@ const Navbar = () => {
             type="button"
             onClick={() => {
               setMobileOpen(false);
-              openWhatsApp("Hi! I'd like to create a digital invitation.");
+              openWhatsApp(
+                "Hi! I'd like to create a digital wedding invitation.",
+              );
             }}
             className="w-full text-center px-5 py-2 rounded-full bg-primary text-primary-foreground text-sm font-semibold"
           >

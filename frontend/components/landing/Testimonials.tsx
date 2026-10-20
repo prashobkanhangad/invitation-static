@@ -1,30 +1,29 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { Star } from "lucide-react";
 import { openWhatsApp } from "@/utils/whatsapp";
 
 const testimonials = [
   {
     name: "Anupriya & Adarsh",
-    role: "Kanhangad",
+    role: "Kanhangad · Wedding",
     initials: "AA",
     gradient: "from-secondary to-primary/60",
     text: "We didn’t want bulky printed cards, but our families still expected something ‘proper.’ The Invyto invite looked polished on WhatsApp and everyone could open it on their phone without fuss. A few relatives told us they kept going back to check the map and timings.",
   },
   {
     name: "Sanath & Shreya",
-    role: "Thaliparamba",
+    role: "Thaliparamba · Wedding",
     initials: "SS",
     gradient: "from-primary/80 to-secondary/70",
     text: "Half our guest list was out of town. One link for dates, venue, and the story section saved us from repeating the same details in fifty chats. A few people said the page loaded quickly even on slower networks.",
   },
   {
-    name: "Sreejai Sreedeep & Shobana Rambe",
-    role: "Photo album",
-    initials: "SB",
+    name: "Manjima & Srujith",
+    role: "Kerala · Malayalam wedding",
+    initials: "MS",
     gradient: "from-muted to-primary/40",
-    text: "After the wedding we wanted something calmer than a flood of WhatsApp forwards for photos. The album layout felt intentional—people could actually browse instead of scrolling a messy camera roll. Family shared it in our groups and it stayed easy to open on mobile.",
+    text: "Our families needed clear muhurtham timings and a map they could open from WhatsApp. The digital invite felt intentional — not like a casual image forward — and guests asked fewer clarifying questions.",
   },
 ];
 
@@ -41,7 +40,8 @@ const Testimonials = () => (
           From couples we’ve worked with
         </h2>
         <p className="mt-3 text-muted-foreground text-lg max-w-xl mx-auto">
-          Short, honest feedback—how the invite and album worked in real celebrations.
+          Honest feedback on how a WhatsApp wedding e-invite worked for real
+          families in Kerala.
         </p>
       </motion.div>
 
@@ -55,12 +55,9 @@ const Testimonials = () => (
             transition={{ delay: i * 0.08 }}
             className="rounded-2xl border border-border bg-card p-8 hover:border-primary/30 transition-colors"
           >
-            <div className="flex gap-1 mb-4">
-              {[...Array(5)].map((_, j) => (
-                <Star key={j} className="w-4 h-4 fill-primary text-primary" />
-              ))}
-            </div>
-            <p className="text-foreground/90 leading-relaxed mb-6 text-[15px]">&ldquo;{t.text}&rdquo;</p>
+            <p className="text-foreground/90 leading-relaxed mb-6 text-[15px]">
+              &ldquo;{t.text}&rdquo;
+            </p>
             <div className="flex items-center gap-3">
               <div
                 className={`w-10 h-10 rounded-full bg-gradient-to-br ${t.gradient} flex items-center justify-center text-[10px] font-bold text-primary-foreground leading-tight text-center px-0.5 shrink-0`}
@@ -68,7 +65,9 @@ const Testimonials = () => (
                 {t.initials}
               </div>
               <div className="min-w-0">
-                <p className="font-medium text-foreground text-sm leading-snug">{t.name}</p>
+                <p className="font-medium text-foreground text-sm leading-snug">
+                  {t.name}
+                </p>
                 <p className="text-xs text-muted-foreground">{t.role}</p>
               </div>
             </div>
@@ -79,7 +78,11 @@ const Testimonials = () => (
       <div className="mt-14 text-center">
         <button
           type="button"
-          onClick={() => openWhatsApp("Hi! I read the testimonials and want to know more.")}
+          onClick={() =>
+            openWhatsApp(
+              "Hi! I read the testimonials and want a digital wedding invitation.",
+            )
+          }
           className="inline-flex rounded-full bg-primary px-8 py-3 text-sm font-semibold text-primary-foreground transition hover:brightness-110"
         >
           Chat with us on WhatsApp
