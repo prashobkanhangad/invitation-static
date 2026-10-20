@@ -56,12 +56,12 @@ export const metadata: Metadata = {
     images: ["https://www.invyto.in/anjana-jishnu/og.jpg"],
   },
   robots: {
-    index: true,
-    follow: true,
+    index: false,
+    follow: false,
     nocache: false,
     googleBot: {
-      index: true,
-      follow: true,
+      index: false,
+      follow: false,
       "max-video-preview": -1,
       "max-image-preview": "large",
       "max-snippet": -1,

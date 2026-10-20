@@ -1,7 +1,28 @@
+import Link from "next/link";
+
 const footerLinks = {
-  Product: ["Features", "Pricing", "Templates", "API"],
-  Company: ["About", "Blog", "Careers", "Press"],
-  Support: ["Help Center", "Contact", "Privacy", "Terms"],
+  Product: [
+    { label: "What's inside", href: "/#features" },
+    { label: "How it works", href: "/#how-it-works" },
+    { label: "Live examples", href: "/#live-examples" },
+    { label: "Pricing", href: "/pricing" },
+  ],
+  Explore: [
+    { label: "Malayalam invitations", href: "/wedding-invitations/malayalam" },
+    { label: "Kerala invitations", href: "/wedding-invitations/kerala" },
+    { label: "Hindu e-invites", href: "/wedding-invitations/hindu" },
+    {
+      label: "Digital vs printed",
+      href: "/compare/digital-vs-printed-wedding-invitations",
+    },
+    { label: "Blog", href: "/blog" },
+  ],
+  Company: [
+    { label: "About", href: "/about" },
+    { label: "Contact", href: "/contact" },
+    { label: "Privacy", href: "/privacy" },
+    { label: "Terms", href: "/terms" },
+  ],
 };
 
 const Footer = () => (
@@ -9,30 +30,31 @@ const Footer = () => (
     <div className="container mx-auto px-6">
       <div className="grid md:grid-cols-4 gap-10">
         <div>
-          <span className="font-display text-2xl font-semibold text-gradient-gold">Invyto</span>
-          <p className="mt-3 text-sm text-muted-foreground max-w-xs">
-            Beautiful digital invitations and AI-powered photo delivery for modern celebrations.
+          <Link
+            href="/"
+            className="font-display text-2xl font-semibold text-gradient-gold"
+          >
+            Invyto
+          </Link>
+          <p className="mt-3 text-sm text-muted-foreground max-w-xs leading-relaxed">
+            Invyto is an India-based platform for creating digital wedding
+            invitations that you share as a single link on WhatsApp.
           </p>
-          <div className="mt-6 flex gap-4">
-            {["X", "In", "Ig"].map((s) => (
-              <div
-                key={s}
-                className="w-8 h-8 rounded-full bg-muted flex items-center justify-center text-xs text-muted-foreground hover:bg-primary/20 hover:text-primary transition-colors cursor-pointer"
-              >
-                {s}
-              </div>
-            ))}
-          </div>
         </div>
         {Object.entries(footerLinks).map(([group, links]) => (
           <div key={group}>
-            <h4 className="font-semibold text-foreground text-sm mb-4">{group}</h4>
+            <h4 className="font-semibold text-foreground text-sm mb-4">
+              {group}
+            </h4>
             <ul className="space-y-2.5">
               {links.map((l) => (
-                <li key={l}>
-                  <a href="#" className="text-sm text-muted-foreground hover:text-primary transition-colors">
-                    {l}
-                  </a>
+                <li key={l.href}>
+                  <Link
+                    href={l.href}
+                    className="text-sm text-muted-foreground hover:text-primary transition-colors"
+                  >
+                    {l.label}
+                  </Link>
                 </li>
               ))}
             </ul>
@@ -40,8 +62,12 @@ const Footer = () => (
         ))}
       </div>
       <div className="mt-14 pt-6 border-t border-border flex flex-col md:flex-row justify-between items-center gap-4">
-        <p className="text-xs text-muted-foreground">© 2025 Invyto. All rights reserved.</p>
-        <p className="text-xs text-muted-foreground italic font-display">Celebrate beautifully.</p>
+        <p className="text-xs text-muted-foreground">
+          © {new Date().getFullYear()} Invyto. All rights reserved.
+        </p>
+        <p className="text-xs text-muted-foreground italic font-display">
+          Digital wedding invitations for WhatsApp.
+        </p>
       </div>
     </div>
   </footer>

@@ -57,6 +57,7 @@ export async function generateMetadata({ params }: LayoutProps): Promise<Metadat
       description,
       ...(heroAbsolute ? { images: [heroAbsolute] } : {}),
     },
+    robots: { index: false, follow: false },
   };
 }
 

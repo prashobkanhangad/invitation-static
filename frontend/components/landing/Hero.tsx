@@ -19,7 +19,7 @@ const Hero = () => (
         transition={{ duration: 0.5 }}
         className="text-sm font-medium uppercase tracking-[0.2em] text-primary"
       >
-        Digital invitations &amp; smart albums
+        Digital wedding invitations · India
       </motion.p>
       <motion.h1
         initial={{ opacity: 0, y: 20 }}
@@ -27,8 +27,8 @@ const Hero = () => (
         transition={{ duration: 0.55, delay: 0.08 }}
         className="mt-6 font-display text-4xl font-semibold leading-tight text-foreground md:text-6xl md:leading-tight max-w-4xl mx-auto text-balance"
       >
-        Celebrate every milestone with{" "}
-        <span className="text-gradient-gold">elegant invites</span> and effortless photo sharing
+        Digital Wedding Invitations, Made for Sharing on{" "}
+        <span className="text-gradient-gold">WhatsApp</span>
       </motion.h1>
       <motion.p
         initial={{ opacity: 0, y: 16 }}
@@ -36,7 +36,8 @@ const Hero = () => (
         transition={{ duration: 0.5, delay: 0.18 }}
         className="mt-6 max-w-2xl mx-auto text-lg text-muted-foreground"
       >
-        Design stunning invitations, host your gallery, and let guests find their photos with AI — all in one place.
+        One polished link with your dates, venue map, timings and story — so
+        families stop repeating the same details in fifty chats.
       </motion.p>
       <motion.div
         initial={{ opacity: 0, y: 16 }}
@@ -46,17 +47,21 @@ const Hero = () => (
       >
         <button
           type="button"
-          onClick={() => openWhatsApp("Hi! I want to get started with invitations.")}
+          onClick={() =>
+            openWhatsApp(
+              "Hi! I'd like to create a digital wedding invitation for WhatsApp.",
+            )
+          }
           className="inline-flex items-center gap-2 rounded-full bg-primary px-8 py-3.5 text-sm font-semibold text-primary-foreground shadow-lg shadow-primary/25 transition hover:brightness-110"
         >
-          Get started free
+          Create your invitation free
           <ArrowRight className="h-4 w-4" />
         </button>
         <a
-          href="#features"
+          href="#live-examples"
           className="text-sm font-medium text-muted-foreground underline-offset-4 hover:text-foreground hover:underline"
         >
-          Explore features
+          See a live invitation
         </a>
       </motion.div>
     </div>

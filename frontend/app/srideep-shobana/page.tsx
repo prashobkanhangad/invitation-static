@@ -48,7 +48,7 @@ export const metadata: Metadata = {
     description: "A collection of cherished moments.",
     images: [ALBUM_COVER],
   },
-  robots: { index: true, follow: true },
+  robots: { index: false, follow: false },
 };
 
 export default function SrideepShobanaAlbumPage() {

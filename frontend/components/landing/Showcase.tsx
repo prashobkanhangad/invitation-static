@@ -2,18 +2,38 @@
 
 import Link from "next/link";
 
-/**
- * Couple / client-specific invitations only (custom URL + proper names from each site).
- * Generic demos (romantic-wedding, elegent-wedding) are omitted.
- * surya_gayathri-subrahmanyan-2 omitted: same Sanath & Shreya content as /sanath-sreya with a mismatched path.
- */
-const CUSTOM_INVITATIONS = [
-  { href: "/anupriya-adarsh", name: "Anupriya & Adarsh" },
-  { href: "/arun-shilpa", name: "Shilpa & Arun" },
-  { href: "/jithendra_and_nanditha", name: "Jithendra & Nanditha" },
-  { href: "/sanath-sreya", name: "Sanath & Shreya" },
-  { href: "/srideep-shobana", name: "Sreejai Sreedeep & Shobana Rambe" },
-  { href: "/surya_gayathri-subrahmanyan", name: "Surya Gayathri & Subrahmanyan" },
+/** Consented demo / showcase invitations — wedding invites only. */
+const LIVE_EXAMPLES = [
+  {
+    href: "/anjana-jishnu",
+    name: "Anjana & Jishnu",
+    place: "Nileshwar · Kerala",
+  },
+  {
+    href: "/puneeth-suma",
+    name: "Puneeth & Suma",
+    place: "Kaiwara · Karnataka",
+  },
+  {
+    href: "/anupriya-adarsh",
+    name: "Anupriya & Adarsh",
+    place: "Kanhangad · Kerala",
+  },
+  {
+    href: "/sanath-sreya",
+    name: "Sanath & Shreya",
+    place: "Thaliparamba · Kerala",
+  },
+  {
+    href: "/arun-shilpa",
+    name: "Shilpa & Arun",
+    place: "Kerala wedding",
+  },
+  {
+    href: "/manjima-srujith",
+    name: "Manjima & Srujith",
+    place: "Malayalam wedding",
+  },
 ] as const;
 
 const colorSchemes = [
@@ -28,11 +48,13 @@ const colorSchemes = [
 function InviteCard({
   href,
   name,
+  place,
   colors,
   accent,
 }: {
   href: string;
   name: string;
+  place: string;
   colors: string;
   accent: string;
 }) {
@@ -45,31 +67,34 @@ function InviteCard({
       <p className="font-display text-lg sm:text-xl font-semibold text-foreground leading-snug break-words px-1">
         {name}
       </p>
-      <p className="text-xs text-muted-foreground mt-4 font-body">Open live invitation →</p>
+      <p className="text-xs text-muted-foreground mt-2">{place}</p>
+      <p className="text-xs text-primary mt-4 font-medium">
+        Open live invitation →
+      </p>
       <div className="w-10 h-px bg-primary/50 mt-4 shrink-0" />
     </Link>
   );
 }
 
 const Showcase = () => {
-  const cards = CUSTOM_INVITATIONS.map((t, i) => ({
-    href: t.href,
-    name: t.name,
+  const cards = LIVE_EXAMPLES.map((t, i) => ({
+    ...t,
     ...colorSchemes[i % colorSchemes.length],
   }));
 
   return (
-    <section className="py-24 md:py-32 overflow-hidden bg-muted/20">
+    <section id="live-examples" className="py-24 md:py-32 overflow-hidden bg-muted/20">
       <div className="container mx-auto px-6 mb-12 text-center">
         <h2 className="font-display text-4xl md:text-5xl font-semibold text-foreground">
-          Invitation templates
+          Live wedding invitation examples
         </h2>
         <p className="mt-4 text-muted-foreground text-lg max-w-2xl mx-auto">
-          Real celebrations — open a live invitation to see the full experience.
+          Open a real Invyto invitation to see how it looks when shared on
+          WhatsApp — dates, map, timings and story in one link.
         </p>
       </div>
 
-      <div className="relative group">
+      <div className="relative">
         <div className="flex gap-6 animate-scroll-left hover:[animation-play-state:paused]">
           {[...cards, ...cards].map((c, i) => (
             <InviteCard key={`${c.href}-${i}`} {...c} />

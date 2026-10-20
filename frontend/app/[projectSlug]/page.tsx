@@ -65,7 +65,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
       description,
       ...(heroAbsolute ? { images: [heroAbsolute] } : {}),
     },
-    robots: { index: true, follow: true },
+    robots: { index: false, follow: false },
   };
 }
 
