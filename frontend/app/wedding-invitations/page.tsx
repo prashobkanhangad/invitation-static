@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import MarketingShell from "@/components/landing/MarketingShell";
+import PageHeader from "@/components/landing/PageHeader";
+import { PageAside } from "@/components/landing/PageCta";
 
 export const metadata: Metadata = {
   title: "Wedding Invitations",
@@ -30,30 +32,29 @@ const links = [
 export default function WeddingInvitationsHub() {
   return (
     <MarketingShell>
-      <div className="container mx-auto px-6 max-w-3xl">
-        <h1 className="font-display text-4xl md:text-5xl font-semibold text-foreground">
-          Digital wedding invitations
-        </h1>
-        <p className="mt-6 text-lg text-muted-foreground leading-relaxed">
-          Invyto is an India-based platform for creating digital wedding
-          invitations that you share as a single link on WhatsApp. Start with a
-          language or tradition page below.
-        </p>
-        <ul className="mt-10 space-y-4">
+      <div className="container mx-auto max-w-3xl px-6">
+        <PageHeader
+          title="Digital wedding invitations"
+          lead="Invyto is an India-based platform for creating digital wedding invitations that you share as a single link on WhatsApp. Start with a language or tradition page below."
+        />
+        <ul className="mt-12 list-none">
           {links.map((l) => (
             <li key={l.href}>
               <Link
                 href={l.href}
-                className="block rounded-2xl border border-border bg-card p-6 hover:border-primary/40 transition-colors"
+                className="block border-b border-border/80 py-7 transition hover:border-primary/45"
               >
-                <h2 className="font-display text-xl font-semibold text-foreground">
+                <h2 className="font-display text-[1.55rem] font-light tracking-[-0.02em] text-foreground md:text-[1.7rem]">
                   {l.title}
                 </h2>
-                <p className="mt-2 text-sm text-muted-foreground">{l.desc}</p>
+                <p className="mt-2 text-sm font-light leading-relaxed text-muted-foreground">
+                  {l.desc}
+                </p>
               </Link>
             </li>
           ))}
         </ul>
+        <PageAside />
       </div>
     </MarketingShell>
   );

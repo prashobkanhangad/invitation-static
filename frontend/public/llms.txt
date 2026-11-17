@@ -1,0 +1,62 @@
+# Invyto
+
+> Invyto is an India-based platform for digital wedding invitations shared as one WhatsApp link — with dates, venue map, timings and your story.
+
+Invyto focuses on Kerala and Malayalam weddings first. Couples browse live examples, then create a polished mobile invitation guests open in the browser (no app or login).
+
+## Primary pages
+
+- [Home](https://www.invyto.in/): Digital wedding invitations for WhatsApp
+- [Live examples](https://www.invyto.in/#live-examples): Browse live invitation examples
+- [Wedding invitations](https://www.invyto.in/wedding-invitations): Hub for language and tradition pages
+- [Malayalam wedding invitation](https://www.invyto.in/wedding-invitations/malayalam)
+- [Kerala wedding invitation](https://www.invyto.in/wedding-invitations/kerala)
+- [Hindu wedding e-invite](https://www.invyto.in/wedding-invitations/hindu)
+- [Digital vs printed](https://www.invyto.in/compare/digital-vs-printed-wedding-invitations)
+- [Blog](https://www.invyto.in/blog): Guides on WhatsApp e-invites and wording
+- [About](https://www.invyto.in/about)
+- [Contact](https://www.invyto.in/contact)
+- [Privacy](https://www.invyto.in/privacy)
+- [Terms](https://www.invyto.in/terms)
+
+## Blog guides
+
+- [Blog index](https://www.invyto.in/blog)
+- [How to make a digital wedding invitation on your phone](https://www.invyto.in/blog/how-to-make-a-digital-wedding-invitation-on-phone)
+- [WhatsApp wedding invitation message format](https://www.invyto.in/blog/whatsapp-wedding-invitation-message-format)
+- [Malayalam wedding invitation wording](https://www.invyto.in/blog/malayalam-wedding-invitation-wording)
+- [Hindu wedding invitation wording](https://www.invyto.in/blog/hindu-wedding-invitation-wording)
+- [Is a digital invite OK for elders?](https://www.invyto.in/blog/is-digital-wedding-invitation-ok-for-elders)
+- [When to send a digital wedding invitation](https://www.invyto.in/blog/when-to-send-digital-wedding-invitation-whatsapp)
+- [WhatsApp broadcast vs group](https://www.invyto.in/blog/whatsapp-broadcast-vs-group-wedding-invite)
+- [Digital wedding invitation checklist](https://www.invyto.in/blog/digital-wedding-invitation-checklist-india)
+- [Add Google Maps to a wedding invitation](https://www.invyto.in/blog/how-to-add-google-maps-to-wedding-invitation)
+- [Kerala muhurtham & reception details](https://www.invyto.in/blog/kerala-wedding-invitation-muhurtham-reception-details)
+- [Digital link vs video invite](https://www.invyto.in/blog/digital-vs-video-wedding-invitation-whatsapp)
+- [Guest list mistakes](https://www.invyto.in/blog/guest-list-mistakes-digital-wedding-invites)
+- [Save the date vs wedding invitation](https://www.invyto.in/blog/save-the-date-vs-wedding-invitation-whatsapp)
+- [North Kerala invitation etiquette](https://www.invyto.in/blog/north-kerala-wedding-invitation-etiquette)
+- [Digital wedding invitation cost in India](https://www.invyto.in/blog/how-much-does-digital-wedding-invitation-cost-india)
+
+## Live invitation examples
+
+- [Vasudevan & Athira](https://www.invyto.in/vasudevan-athira)
+- [Vasudevan & Athira (alt)](https://www.invyto.in/vasudevan-athira-2)
+- [Shreerag & Revathi](https://www.invyto.in/shreerag-revathi)
+- [Anjana & Jishnu](https://www.invyto.in/anjana-jishnu)
+- [Puneeth & Suma](https://www.invyto.in/puneeth-suma)
+- [Anupriya & Adarsh](https://www.invyto.in/anupriya-adarsh)
+- [Sanath & Shreya](https://www.invyto.in/sanath-sreya)
+- [Shilpa & Arun](https://www.invyto.in/arun-shilpa)
+- [Manjima & Srujith](https://www.invyto.in/manjima-srujith)
+- [Srideep & Shobana](https://www.invyto.in/srideep-shobana)
+- [Jithendra & Nanditha](https://www.invyto.in/jithendra_and_nanditha)
+- [Surya & Gayathri](https://www.invyto.in/surya_gayathri-subrahmanyan)
+- [Surya & Gayathri (alt)](https://www.invyto.in/surya_gayathri-subrahmanyan-2)
+- [Romantic wedding](https://www.invyto.in/romantic-wedding)
+- [Elegant wedding](https://www.invyto.in/elegent-wedding)
+
+## Optional
+
+- [Sitemap](https://www.invyto.in/sitemap.xml)
+- [llms.txt](https://www.invyto.in/llms.txt)

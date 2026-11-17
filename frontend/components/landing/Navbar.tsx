@@ -6,11 +6,9 @@ import { Menu, X } from "lucide-react";
 import { openWhatsApp } from "@/utils/whatsapp";
 
 const navLinks = [
-  { label: "What's inside", href: "#features" },
-  { label: "How it works", href: "#how-it-works" },
-  { label: "Examples", href: "#live-examples" },
-  { label: "Pricing", href: "/pricing" },
-  { label: "FAQ", href: "#faq" },
+  { label: "Examples", href: "/#live-examples" },
+  { label: "How it works", href: "/#how-it-works" },
+  { label: "FAQ", href: "/#faq" },
 ];
 
 const Navbar = () => {
@@ -27,27 +25,27 @@ const Navbar = () => {
     <nav
       className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${
         scrolled
-          ? "bg-background/80 backdrop-blur-xl border-b border-border shadow-lg shadow-background/50"
+          ? "border-b border-border bg-background/85 backdrop-blur-xl"
           : "bg-transparent"
       }`}
     >
-      <div className="container mx-auto flex items-center justify-between py-4 px-6">
+      <div className="container mx-auto flex items-center justify-between px-6 py-4">
         <Link
           href="/"
-          className="font-display text-2xl font-semibold tracking-wide text-gradient-gold"
+          className="font-display text-2xl font-light tracking-[-0.03em] text-foreground"
         >
           Invyto
         </Link>
 
-        <div className="hidden md:flex items-center gap-8">
+        <div className="hidden items-center gap-8 md:flex">
           {navLinks.map((l) => (
-            <a
+            <Link
               key={l.href}
               href={l.href}
-              className="text-sm font-medium text-muted-foreground hover:text-primary transition-colors"
+              className="text-sm font-light text-muted-foreground transition-colors hover:text-foreground"
             >
               {l.label}
-            </a>
+            </Link>
           ))}
           <button
             type="button"
@@ -56,15 +54,15 @@ const Navbar = () => {
                 "Hi! I'd like to create a digital wedding invitation.",
               )
             }
-            className="px-5 py-2 rounded-full bg-primary text-primary-foreground text-sm font-semibold hover:brightness-110 transition"
+            className="rounded-full border border-border/80 bg-background/20 px-5 py-2 text-sm font-medium text-foreground backdrop-blur-sm transition hover:border-primary/50"
           >
-            Get Started
+            WhatsApp
           </button>
         </div>
 
         <button
           type="button"
-          className="md:hidden text-foreground"
+          className="text-foreground md:hidden"
           onClick={() => setMobileOpen(!mobileOpen)}
           aria-label="Toggle menu"
         >
@@ -73,16 +71,16 @@ const Navbar = () => {
       </div>
 
       {mobileOpen && (
-        <div className="md:hidden bg-background/95 backdrop-blur-xl border-b border-border px-6 pb-6 space-y-4">
+        <div className="space-y-4 border-b border-border bg-background/95 px-6 pb-6 backdrop-blur-xl md:hidden">
           {navLinks.map((l) => (
-            <a
+            <Link
               key={l.href}
               href={l.href}
               onClick={() => setMobileOpen(false)}
-              className="block text-sm font-medium text-muted-foreground hover:text-primary transition-colors"
+              className="block text-sm font-light text-muted-foreground hover:text-foreground"
             >
               {l.label}
-            </a>
+            </Link>
           ))}
           <button
             type="button"
@@ -92,9 +90,9 @@ const Navbar = () => {
                 "Hi! I'd like to create a digital wedding invitation.",
               );
             }}
-            className="w-full text-center px-5 py-2 rounded-full bg-primary text-primary-foreground text-sm font-semibold"
+            className="w-full rounded-full border border-border px-5 py-2 text-sm font-medium text-foreground"
           >
-            Get Started
+            WhatsApp
           </button>
         </div>
       )}

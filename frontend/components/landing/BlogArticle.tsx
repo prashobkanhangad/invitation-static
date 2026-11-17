@@ -1,6 +1,9 @@
 import Link from "next/link";
 import MarketingShell from "@/components/landing/MarketingShell";
+import PageHeader from "@/components/landing/PageHeader";
+import { PageAside, articleProse } from "@/components/landing/PageCta";
 import type { BlogPost } from "@/lib/blogPosts";
+import { getBlogPostsSorted } from "@/lib/blogPosts";
 
 export default function BlogArticle({
   post,
@@ -9,49 +12,90 @@ export default function BlogArticle({
   post: BlogPost;
   children: React.ReactNode;
 }) {
+  const related = getBlogPostsSorted()
+    .filter((p) => p.slug !== post.slug)
+    .slice(0, 3);
+
   return (
     <MarketingShell>
-      <article className="container mx-auto px-6 max-w-3xl">
-        <p className="text-sm text-primary font-medium">
-          <Link href="/blog" className="hover:underline">
-            Blog
-          </Link>{" "}
-          / {post.topic}
-        </p>
-        <h1 className="mt-4 font-display text-4xl md:text-5xl font-semibold text-foreground text-balance">
-          {post.title}
-        </h1>
-        <p className="mt-3 text-sm text-muted-foreground">
+      <article className="container mx-auto max-w-3xl px-6">
+        <PageHeader
+          crumbs={[
+            { href: "/blog", label: "Blog" },
+            { href: `/blog/${post.slug}`, label: post.topic },
+          ]}
+          title={post.title}
+          lead={post.description}
+        />
+
+        <p className="mt-4 text-sm font-light text-muted-foreground">
           Updated{" "}
           {new Date(post.date).toLocaleDateString("en-IN", {
             year: "numeric",
             month: "long",
             day: "numeric",
           })}
+          <span className="mx-2 text-border">·</span>
+          {post.readMinutes} min read
         </p>
-        <div className="mt-10 space-y-6 text-muted-foreground leading-relaxed [&_h2]:font-display [&_h2]:text-2xl [&_h2]:font-semibold [&_h2]:text-foreground [&_h2]:mt-10 [&_h2]:mb-3 [&_ul]:list-disc [&_ul]:pl-5 [&_ul]:space-y-2 [&_ol]:list-decimal [&_ol]:pl-5 [&_ol]:space-y-2 [&_strong]:text-foreground [&_a]:text-primary [&_a]:underline-offset-4 hover:[&_a]:underline">
-          {children}
+
+        <div className="mt-8 overflow-hidden rounded-[1.25rem] border border-border/70">
+          <img
+            src={post.image}
+            alt={post.imageAlt}
+            width={1600}
+            height={900}
+            className="aspect-[16/9] h-auto w-full object-cover"
+          />
         </div>
-        <aside className="mt-14 rounded-2xl border border-border bg-card p-6">
-          <p className="font-display text-xl font-semibold text-foreground">
-            Create yours with Invyto
-          </p>
-          <p className="mt-2 text-sm text-muted-foreground leading-relaxed">
-            Invyto is an India-based platform for creating digital wedding
-            invitations that you share as a single link on WhatsApp.
-          </p>
-          <div className="mt-4 flex flex-wrap gap-4 text-sm">
-            <Link href="/contact" className="text-primary font-medium hover:underline">
-              Contact us
-            </Link>
-            <Link href="/#live-examples" className="text-primary font-medium hover:underline">
-              See live examples
-            </Link>
-            <Link href="/blog" className="text-muted-foreground hover:underline">
-              More articles
-            </Link>
-          </div>
-        </aside>
+
+        <div className={articleProse}>{children}</div>
+
+        <PageAside />
+
+        {related.length > 0 ? (
+          <section className="mt-14 border-t border-border/80 pt-10">
+            <h2 className="font-display text-2xl font-light tracking-[-0.02em] text-foreground">
+              Keep reading
+            </h2>
+            <ul className="mt-6 list-none space-y-4">
+              {related.map((p) => (
+                <li key={p.slug}>
+                  <Link
+                    href={`/blog/${p.slug}`}
+                    className="group flex gap-4 border-b border-border/60 pb-4 transition hover:border-primary/40"
+                  >
+                    <img
+                      src={p.image}
+                      alt=""
+                      width={160}
+                      height={90}
+                      className="h-16 w-24 shrink-0 rounded-lg object-cover"
+                      aria-hidden
+                    />
+                    <span className="min-w-0">
+                      <span className="block text-[11px] uppercase tracking-[0.18em] text-primary">
+                        {p.topic}
+                      </span>
+                      <span className="mt-1 block font-display text-lg font-light leading-snug text-foreground group-hover:text-primary">
+                        {p.title}
+                      </span>
+                    </span>
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          </section>
+        ) : null}
+
+        <p className="mt-10 text-sm text-muted-foreground">
+          <Link
+            href="/blog"
+            className="text-primary underline-offset-4 hover:underline"
+          >
+            ← All articles
+          </Link>
+        </p>
       </article>
     </MarketingShell>
   );

@@ -1,81 +1,73 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { openWhatsApp } from "@/utils/whatsapp";
 
 const steps = [
   {
     num: "01",
-    title: "Choose a style",
-    desc: "Pick a look that fits your wedding — Kerala, Hindu or Christian celebrations we craft often.",
+    title: "Share your details",
+    desc: "Send dates, venue, muhurtham timings, family names and photos on WhatsApp.",
   },
   {
     num: "02",
-    title: "Add your details",
-    desc: "Share dates, venue, muhurtham timings, family names and photos. We build the page for you.",
+    title: "We design the invite",
+    desc: "We craft a mobile invitation that matches your wedding — Kerala, Hindu or beyond.",
   },
   {
     num: "03",
-    title: "Share on WhatsApp",
-    desc: "Get one link. Paste it into chats and groups. Guests open it on their phone with no login.",
+    title: "Share one link",
+    desc: "Paste the Invyto link into chats and groups. Guests open it instantly in the browser.",
   },
 ];
 
 const HowItWorks = () => (
-  <section id="how-it-works" className="py-24 md:py-32 bg-muted/30">
+  <section id="how-it-works" className="border-t border-border bg-secondary/40 py-24 md:py-32">
     <div className="container mx-auto px-6">
       <motion.div
-        initial={{ opacity: 0, y: 20 }}
+        initial={{ opacity: 0, y: 18 }}
         whileInView={{ opacity: 1, y: 0 }}
         viewport={{ once: true }}
-        className="text-center mb-14"
+        className="mx-auto max-w-2xl text-center"
       >
-        <h2 className="font-display text-4xl md:text-5xl font-semibold text-foreground">
-          How it works for couples
+        <h2 className="font-display text-4xl font-medium text-foreground md:text-5xl">
+          How it works
         </h2>
-        <p className="mt-4 text-muted-foreground text-lg">
-          Three steps from idea to a WhatsApp-ready wedding e-invite.
+        <p className="mt-4 text-lg text-muted-foreground">
+          Three steps from your details to a WhatsApp-ready wedding e-invite.
         </p>
       </motion.div>
 
-      <ol className="grid md:grid-cols-3 gap-8 list-none max-w-5xl mx-auto">
+      <ol className="mx-auto mt-16 grid max-w-5xl list-none gap-12 md:grid-cols-3 md:gap-8">
         {steps.map((step, i) => (
           <motion.li
             key={step.num}
-            initial={{ opacity: 0, y: 24 }}
+            initial={{ opacity: 0, y: 20 }}
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true }}
-            transition={{ delay: i * 0.1 }}
-            className="relative text-center"
+            transition={{ delay: i * 0.08 }}
+            className="text-center md:text-left"
           >
-            <div className="w-16 h-16 rounded-full bg-primary/10 border border-primary/20 flex items-center justify-center mx-auto mb-4">
-              <span className="font-display text-xl font-semibold text-primary">
-                {step.num}
-              </span>
-            </div>
-            <h3 className="font-display text-xl font-semibold text-foreground mb-2">
+            <p className="font-display text-4xl font-light text-primary/80">
+              {step.num}
+            </p>
+            <h3 className="font-display mt-4 text-2xl text-foreground">
               {step.title}
             </h3>
-            <p className="text-sm text-muted-foreground leading-relaxed">
+            <p className="mt-3 text-sm leading-relaxed text-muted-foreground">
               {step.desc}
             </p>
           </motion.li>
         ))}
       </ol>
 
-      <div className="mt-14 text-center">
-        <button
-          type="button"
-          onClick={() =>
-            openWhatsApp(
-              "Hi! I want to create a digital wedding invitation in 3 steps.",
-            )
-          }
-          className="inline-flex rounded-full bg-primary px-8 py-3 text-sm font-semibold text-primary-foreground transition hover:brightness-110"
+      <p className="mt-14 text-center">
+        <a
+          href="#live-examples"
+          className="text-sm font-medium text-primary underline-offset-4 hover:underline"
         >
-          Start on WhatsApp
-        </button>
-      </div>
+          Browse live examples first →
+        </a>
+      </p>
     </div>
   </section>
 );

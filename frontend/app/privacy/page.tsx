@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
 import MarketingShell from "@/components/landing/MarketingShell";
+import PageHeader from "@/components/landing/PageHeader";
+import { articleProse } from "@/components/landing/PageCta";
 
 export const metadata: Metadata = {
   title: "Privacy Policy",
@@ -11,22 +13,18 @@ export const metadata: Metadata = {
 export default function PrivacyPage() {
   return (
     <MarketingShell>
-      <article className="container mx-auto px-6 max-w-3xl prose-invert">
-        <h1 className="font-display text-4xl md:text-5xl font-semibold text-foreground">
-          Privacy Policy
-        </h1>
-        <p className="mt-2 text-sm text-muted-foreground">
+      <article className="container mx-auto max-w-3xl px-6">
+        <PageHeader title="Privacy Policy" />
+        <p className="mt-4 text-sm font-light text-muted-foreground">
           Last updated: {new Date().getFullYear()}
         </p>
-        <div className="mt-8 space-y-6 text-muted-foreground leading-relaxed">
+        <div className={articleProse}>
           <p>
             Invyto (&quot;we&quot;, &quot;us&quot;) operates invyto.in. This
             policy explains how we handle information when you create a digital
             wedding invitation, visit our site, or open an invitation link.
           </p>
-          <h2 className="font-display text-xl font-semibold text-foreground">
-            Information we collect
-          </h2>
+          <h2>Information we collect</h2>
           <p>
             When you contact us or book an invitation, we collect details you
             share — such as names, wedding dates, venue text, photos you upload,
@@ -38,33 +36,22 @@ export default function PrivacyPage() {
             understand site traffic. Invitation pages may collect basic visit
             metrics so we can improve load performance.
           </p>
-          <h2 className="font-display text-xl font-semibold text-foreground">
-            How we use information
-          </h2>
+          <h2>How we use information</h2>
           <p>
             We use your information to deliver the invitation, respond to
             support requests, process payments where applicable, and improve the
             product. We do not sell personal information.
           </p>
-          <h2 className="font-display text-xl font-semibold text-foreground">
-            Sharing
-          </h2>
+          <h2>Sharing</h2>
           <p>
             Invitation content you approve is visible to anyone with the link.
             Hosting and infrastructure providers process data only to run the
             service. We may disclose information if required by law.
           </p>
-          <h2 className="font-display text-xl font-semibold text-foreground">
-            Contact
-          </h2>
+          <h2>Contact</h2>
           <p>
             Privacy questions:{" "}
-            <a
-              href="mailto:hello@invyto.in"
-              className="text-primary underline-offset-4 hover:underline"
-            >
-              hello@invyto.in
-            </a>
+            <a href="mailto:hello@invyto.in">hello@invyto.in</a>
           </p>
         </div>
       </article>

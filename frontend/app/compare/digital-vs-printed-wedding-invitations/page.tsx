@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
-import Link from "next/link";
 import MarketingShell from "@/components/landing/MarketingShell";
+import PageHeader from "@/components/landing/PageHeader";
+import { PageAside, PageLink, articleProse } from "@/components/landing/PageCta";
 
 export const metadata: Metadata = {
   title: "Digital vs Printed Wedding Invitations",
@@ -43,66 +44,62 @@ const rows = [
 export default function DigitalVsPrintedPage() {
   return (
     <MarketingShell>
-      <article className="container mx-auto px-6 max-w-4xl">
-        <h1 className="font-display text-4xl md:text-5xl font-semibold text-foreground text-balance">
-          Digital vs printed wedding invitations
-        </h1>
-        <p className="mt-6 text-lg text-muted-foreground leading-relaxed max-w-3xl">
-          In India, many families use a digital wedding invitation for most
-          guests and still send a physical card or make a personal call for
-          elders. Here is a clear comparison.
-        </p>
+      <article className="container mx-auto max-w-4xl px-6">
+        <PageHeader
+          title="Digital vs printed wedding invitations"
+          lead="In India, many families use a digital wedding invitation for most guests and still send a physical card or make a personal call for elders. Here is a clear comparison."
+        />
 
-        <div className="mt-12 overflow-x-auto rounded-2xl border border-border">
+        <div className="mt-12 overflow-x-auto border border-border/80">
           <table className="w-full min-w-[640px] text-left text-sm">
             <thead>
-              <tr className="border-b border-border bg-muted/40">
-                <th className="px-4 py-3 font-semibold text-foreground">
+              <tr className="border-b border-border/80 bg-secondary/40">
+                <th className="px-4 py-3.5 font-medium text-foreground">
                   Factor
                 </th>
-                <th className="px-4 py-3 font-semibold text-foreground">
+                <th className="px-4 py-3.5 font-medium text-foreground">
                   Digital (WhatsApp link)
                 </th>
-                <th className="px-4 py-3 font-semibold text-foreground">
+                <th className="px-4 py-3.5 font-medium text-foreground">
                   Printed cards
                 </th>
               </tr>
             </thead>
             <tbody>
               {rows.map((r) => (
-                <tr key={r.label} className="border-b border-border last:border-0">
-                  <td className="px-4 py-3 font-medium text-foreground">
+                <tr
+                  key={r.label}
+                  className="border-b border-border/60 last:border-0"
+                >
+                  <td className="px-4 py-3.5 font-medium text-foreground">
                     {r.label}
                   </td>
-                  <td className="px-4 py-3 text-muted-foreground">{r.digital}</td>
-                  <td className="px-4 py-3 text-muted-foreground">{r.printed}</td>
+                  <td className="px-4 py-3.5 font-light text-muted-foreground">
+                    {r.digital}
+                  </td>
+                  <td className="px-4 py-3.5 font-light text-muted-foreground">
+                    {r.printed}
+                  </td>
                 </tr>
               ))}
             </tbody>
           </table>
         </div>
 
-        <h2 className="mt-12 font-display text-2xl font-semibold text-foreground">
-          Etiquette with elders
-        </h2>
-        <p className="mt-3 text-muted-foreground leading-relaxed max-w-3xl">
-          It is acceptable to use a digital invite for the wider guest list. For
-          elders who prefer paper, send a digital invite plus a personal call or
-          a physical card. That mix shows respect and still keeps dates, map and
-          timings easy for everyone with a phone.
-        </p>
-
-        <p className="mt-10 text-sm text-muted-foreground">
-          Create yours with{" "}
-          <Link href="/" className="text-primary underline-offset-4 hover:underline">
-            Invyto
-          </Link>{" "}
-          or see{" "}
-          <Link href="/pricing" className="text-primary underline-offset-4 hover:underline">
-            pricing
-          </Link>
-          .
-        </p>
+        <div className={`${articleProse} max-w-3xl`}>
+          <h2>Etiquette with elders</h2>
+          <p>
+            It is acceptable to use a digital invite for the wider guest list. For
+            elders who prefer paper, send a digital invite plus a personal call or
+            a physical card. That mix shows respect and still keeps dates, map and
+            timings easy for everyone with a phone.
+          </p>
+          <p>
+            Create yours with <PageLink href="/">Invyto</PageLink> or{" "}
+            <PageLink href="/contact">message us</PageLink>.
+          </p>
+        </div>
+        <PageAside />
       </article>
     </MarketingShell>
   );

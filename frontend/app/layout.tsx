@@ -8,14 +8,15 @@ export const metadata: Metadata = {
     template: "%s | Invyto",
   },
   description:
-    "Create a digital wedding invitation in minutes. Share one WhatsApp link with dates, venue map and your story. Mobile-fast and eco-friendly. Start free.",
+    "Create a digital wedding invitation for WhatsApp. Browse live Kerala and Malayalam examples, then share one link with dates, venue map, timings and your story.",
   keywords: [
     "digital wedding invitation",
     "WhatsApp wedding invitation",
-    "wedding e-invite",
+    "wedding e-invite India",
     "online wedding invitation maker",
     "Malayalam wedding invitation online",
     "Kerala wedding invitation",
+    "Hindu wedding e-invite",
     "Invyto",
   ],
   authors: [{ name: "Invyto" }],

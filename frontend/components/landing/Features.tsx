@@ -1,83 +1,68 @@
 "use client";
 
 import { motion } from "framer-motion";
-import {
-  CalendarDays,
-  MapPin,
-  BookOpen,
-  Music,
-  Timer,
-  MessageCircle,
-} from "lucide-react";
 
 const features = [
   {
-    icon: CalendarDays,
     title: "Event schedule",
-    desc: "Muhurtham, reception and other ceremony timings in one clear place guests can revisit.",
+    desc: "Muhurtham, reception and ceremony timings guests can reopen anytime.",
   },
   {
-    icon: MapPin,
     title: "Venue map",
-    desc: "Tap-to-open Google Maps so out-of-town relatives find the hall without chasing addresses.",
+    desc: "Tap-to-open Google Maps so relatives find the hall without chasing chats.",
   },
   {
-    icon: BookOpen,
-    title: "Couple story",
-    desc: "A short story section that feels personal — more than a flat image card.",
+    title: "Families & story",
+    desc: "Names, addresses and a short story that feels personal — not a flat PDF.",
   },
   {
-    icon: MessageCircle,
-    title: "WhatsApp-ready link",
-    desc: "One polished link you paste into chats and family groups. It looks proper when shared.",
+    title: "Photo gallery",
+    desc: "A curated set of portraits that match the mood of your celebration.",
   },
   {
-    icon: Timer,
     title: "Countdown",
-    desc: "A live countdown to the big day, built for mobile screens and slower networks.",
+    desc: "A live countdown built for mobile screens and slower networks.",
   },
   {
-    icon: Music,
-    title: "Music & atmosphere",
-    desc: "Optional background music and motion so the invite feels celebratory, not like a PDF.",
+    title: "WhatsApp-ready link",
+    desc: "One polished link for every group chat. Guests need no app or login.",
   },
 ];
 
 const Features = () => (
-  <section id="features" className="py-24 md:py-32">
+  <section id="features" className="border-t border-border py-24 md:py-32">
     <div className="container mx-auto px-6">
       <motion.div
-        initial={{ opacity: 0, y: 20 }}
+        initial={{ opacity: 0, y: 18 }}
         whileInView={{ opacity: 1, y: 0 }}
         viewport={{ once: true }}
-        className="text-center mb-16"
+        className="mx-auto max-w-2xl text-center"
       >
-        <h2 className="font-display text-4xl md:text-5xl font-semibold text-foreground">
+        <h2 className="font-display text-4xl font-medium text-foreground md:text-5xl">
           What&apos;s inside your invitation
         </h2>
-        <p className="mt-4 text-muted-foreground text-lg max-w-2xl mx-auto">
-          Only what guests need — dates, place, timings and your story — in a
-          link that loads quickly on phones.
+        <p className="mt-4 text-lg text-muted-foreground">
+          Everything guests need in one mobile page — dates, place, timings and
+          your story.
         </p>
       </motion.div>
 
-      <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6 lg:gap-8">
+      <div className="mx-auto mt-16 grid max-w-5xl gap-10 sm:grid-cols-2 lg:grid-cols-3">
         {features.map((f, i) => (
           <motion.div
             key={f.title}
-            initial={{ opacity: 0, y: 24 }}
+            initial={{ opacity: 0, y: 20 }}
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true }}
-            transition={{ delay: i * 0.06 }}
-            className="rounded-2xl border border-border bg-card p-7 hover:border-primary/40 transition-colors"
+            transition={{ delay: i * 0.05 }}
           >
-            <div className="w-11 h-11 rounded-xl bg-primary/10 flex items-center justify-center mb-5">
-              <f.icon className="w-5 h-5 text-primary" />
-            </div>
-            <h3 className="font-display text-xl font-semibold text-foreground mb-2">
+            <p className="text-[11px] font-medium uppercase tracking-[0.28em] text-primary">
+              {String(i + 1).padStart(2, "0")}
+            </p>
+            <h3 className="font-display mt-3 text-2xl font-normal text-foreground">
               {f.title}
             </h3>
-            <p className="text-muted-foreground leading-relaxed text-sm">
+            <p className="mt-3 text-sm leading-relaxed text-muted-foreground">
               {f.desc}
             </p>
           </motion.div>
