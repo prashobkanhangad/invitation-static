@@ -1,21 +1,10 @@
 import type { Metadata } from "next";
-import { Fraunces, Sora } from "next/font/google";
+import { invytoDisplay as display, invytoSans as sans } from "@/lib/invytoFonts";
 import { AutoScrollPair } from "./AutoScrollPair";
 import { Countdown } from "./Countdown";
 import { KeepTop } from "./KeepTop";
 import { OpenInviteLink } from "./OpenInviteLink";
 import { Reveal } from "./Reveal";
-
-const display = Fraunces({
-  subsets: ["latin"],
-  weight: ["300", "400", "500", "600"],
-  style: ["normal", "italic"],
-});
-
-const sans = Sora({
-  subsets: ["latin"],
-  weight: ["300", "400", "500"],
-});
 
 export const metadata: Metadata = {
   metadataBase: new URL("https://www.invyto.in"),

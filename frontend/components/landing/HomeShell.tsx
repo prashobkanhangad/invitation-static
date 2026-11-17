@@ -1,23 +1,10 @@
-import { Fraunces, Sora } from "next/font/google";
 import type { ReactNode } from "react";
-
-const display = Fraunces({
-  subsets: ["latin"],
-  weight: ["300", "400", "500", "600"],
-  style: ["normal", "italic"],
-  variable: "--font-invyto-display",
-});
-
-const sans = Sora({
-  subsets: ["latin"],
-  weight: ["300", "400", "500", "600"],
-  variable: "--font-invyto-sans",
-});
+import { invytoDisplay, invytoSans } from "@/lib/invytoFonts";
 
 export default function HomeShell({ children }: { children: ReactNode }) {
   return (
     <div
-      className={`${display.variable} ${sans.variable} invyto-home relative z-[2] min-h-screen bg-background text-foreground antialiased`}
+      className={`${invytoDisplay.variable} ${invytoSans.variable} invyto-home relative z-[2] min-h-screen bg-background text-foreground antialiased`}
     >
       <style>{`
         .invyto-home {
