@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 
 type Photo = {
   src: string;
@@ -13,7 +13,6 @@ const HOLD_MS = 3800;
 const SLIDE_MS = 1100;
 const SLIDE_WIDTH = 0.76;
 const GAP_PX = 5.5;
-// Shared frame for all slides (matches close/lantern). Cover crops alcove slightly — no stretch.
 const BOX_RATIO = 1067 / 1440;
 
 function logicalDot(offset: number, count: number) {
@@ -28,10 +27,14 @@ export function AutoScrollPair({ photos }: { photos: Photo[] }) {
   const trackRef = useRef<HTMLDivElement>(null);
   const [slidePx, setSlidePx] = useState(0);
   const [sidePad, setSidePad] = useState(0);
-  const [pausedUntil, setPausedUntil] = useState(0);
   const [dot, setDot] = useState(0);
+  const [inView, setInView] = useState(false);
+
   const offsetRef = useRef(1);
   const busyRef = useRef(false);
+  const slidePxRef = useRef(0);
+  const pausedUntilRef = useRef(0);
+  const busyTimerRef = useRef(0);
 
   const count = photos.length;
   const loopPhotos =
@@ -41,23 +44,33 @@ export function AutoScrollPair({ photos }: { photos: Photo[] }) {
     const viewport = viewportRef.current;
     if (!viewport) return;
     const width = viewport.clientWidth;
+    if (width < 2) return;
     const slide = Math.round(width * SLIDE_WIDTH);
+    slidePxRef.current = slide;
     setSlidePx(slide);
     setSidePad(Math.round((width - slide) / 2));
   }, []);
 
-  const setTrack = useCallback(
-    (offset: number, animate: boolean) => {
-      const track = trackRef.current;
-      if (!track || !slidePx) return;
-      const step = slidePx + GAP_PX;
-      track.style.transition = animate
-        ? `transform ${SLIDE_MS}ms cubic-bezier(0.22, 1, 0.36, 1)`
-        : "none";
-      track.style.transform = `translate3d(${-offset * step}px, 0, 0)`;
-    },
-    [slidePx],
-  );
+  const setTrack = useCallback((offset: number, animate: boolean) => {
+    const track = trackRef.current;
+    const width = slidePxRef.current;
+    if (!track || !width) return;
+    const step = width + GAP_PX;
+    const next = `translate3d(${-offset * step}px, 0, 0)`;
+
+    if (!animate) {
+      track.style.transition = "none";
+      track.style.webkitTransform = next;
+      track.style.transform = next;
+      // Flush so the next animated move isn't skipped
+      void track.offsetHeight;
+      return;
+    }
+
+    track.style.transition = `transform ${SLIDE_MS}ms cubic-bezier(0.22, 1, 0.36, 1)`;
+    track.style.webkitTransform = next;
+    track.style.transform = next;
+  }, []);
 
   const jumpIfClone = useCallback(() => {
     if (count < 2) {
@@ -80,59 +93,106 @@ export function AutoScrollPair({ photos }: { photos: Photo[] }) {
 
   const goBy = useCallback(
     (delta: number) => {
-      if (count < 2 || busyRef.current || !slidePx) return;
+      if (count < 2 || busyRef.current || !slidePxRef.current) return;
       busyRef.current = true;
       const next = offsetRef.current + delta;
       offsetRef.current = next;
       setDot(logicalDot(next, count));
       setTrack(next, true);
-      window.setTimeout(jumpIfClone, SLIDE_MS + 40);
+
+      window.clearTimeout(busyTimerRef.current);
+      busyTimerRef.current = window.setTimeout(jumpIfClone, SLIDE_MS + 50);
     },
-    [count, jumpIfClone, setTrack, slidePx],
+    [count, jumpIfClone, setTrack],
   );
 
   const pauseAuto = useCallback(() => {
-    setPausedUntil(Date.now() + HOLD_MS + 1500);
+    pausedUntilRef.current = Date.now() + HOLD_MS + 1200;
   }, []);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     measure();
-    window.addEventListener("resize", measure);
-    return () => window.removeEventListener("resize", measure);
-  }, [measure]);
-
-  useEffect(() => {
-    if (!slidePx || count < 1) return;
     offsetRef.current = 1;
     setDot(0);
     setTrack(1, false);
     busyRef.current = false;
-  }, [count, setTrack, slidePx]);
+  }, [measure, setTrack, count]);
 
   useEffect(() => {
-    if (count < 2) return;
-    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    const onResize = () => {
+      measure();
+      setTrack(offsetRef.current, false);
+    };
+    window.addEventListener("resize", onResize);
+    window.addEventListener("orientationchange", onResize);
+    const id = window.setTimeout(() => {
+      measure();
+      setTrack(offsetRef.current, false);
+    }, 100);
+    return () => {
+      window.removeEventListener("resize", onResize);
+      window.removeEventListener("orientationchange", onResize);
+      window.clearTimeout(id);
+    };
+  }, [measure, setTrack]);
 
-    const id = window.setInterval(() => {
-      if (Date.now() < pausedUntil) return;
-      goBy(1);
-    }, HOLD_MS);
+  // Only auto-advance while carousel is on screen (helps mobile timer throttling)
+  useEffect(() => {
+    const el = viewportRef.current;
+    if (!el) return;
 
-    return () => window.clearInterval(id);
-  }, [count, goBy, pausedUntil]);
+    const obs = new IntersectionObserver(
+      ([entry]) => setInView(entry.isIntersecting && entry.intersectionRatio > 0.25),
+      { threshold: [0, 0.25, 0.5] },
+    );
+    obs.observe(el);
+    return () => obs.disconnect();
+  }, []);
+
+  // rAF-based auto advance — more reliable than setInterval on mobile Safari
+  useEffect(() => {
+    if (count < 2 || !inView || !slidePx) return;
+
+    let raf = 0;
+    let last = performance.now();
+
+    const tick = (now: number) => {
+      const elapsed = now - last;
+      if (
+        elapsed >= HOLD_MS &&
+        now >= pausedUntilRef.current &&
+        !busyRef.current
+      ) {
+        last = now;
+        goBy(1);
+      }
+      raf = window.requestAnimationFrame(tick);
+    };
+
+    raf = window.requestAnimationFrame(tick);
+    return () => {
+      window.cancelAnimationFrame(raf);
+      window.clearTimeout(busyTimerRef.current);
+    };
+  }, [count, goBy, inView, slidePx]);
 
   if (count === 0) return null;
 
   const boxH = slidePx ? Math.round(slidePx / BOX_RATIO) : undefined;
+
+  // Reserve height before JS measure so the page doesn't jump past the hero.
+  const reservedAspect = BOX_RATIO / SLIDE_WIDTH;
 
   return (
     <div
       ref={viewportRef}
       className="relative overflow-hidden bg-[#071210]"
       aria-roledescription="carousel"
-      onTouchStart={pauseAuto}
-      onPointerDown={pauseAuto}
-      style={boxH ? { height: boxH } : undefined}
+      style={{
+        height: boxH,
+        aspectRatio: boxH ? undefined : `${reservedAspect}`,
+        overflowAnchor: "none",
+      }}
     >
       <div
         ref={trackRef}
@@ -142,6 +202,8 @@ export function AutoScrollPair({ photos }: { photos: Photo[] }) {
           paddingLeft: sidePad,
           paddingRight: sidePad,
           height: boxH,
+          backfaceVisibility: "hidden",
+          WebkitBackfaceVisibility: "hidden",
         }}
       >
         {loopPhotos.map((photo, i) => (
@@ -158,7 +220,9 @@ export function AutoScrollPair({ photos }: { photos: Photo[] }) {
               alt={i > 0 && i < count + 1 ? photo.alt : ""}
               width={photo.width}
               height={photo.height}
-              loading={i <= 2 ? "eager" : "lazy"}
+              loading="lazy"
+              decoding="async"
+              fetchPriority="low"
               draggable={false}
               aria-hidden={i === 0 || i === count + 1}
               className="va2-photo absolute inset-0 h-full w-full object-cover object-center"

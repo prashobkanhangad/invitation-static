@@ -2,6 +2,8 @@ import type { Metadata } from "next";
 import { Fraunces, Sora } from "next/font/google";
 import { AutoScrollPair } from "./AutoScrollPair";
 import { Countdown } from "./Countdown";
+import { KeepTop } from "./KeepTop";
+import { OpenInviteLink } from "./OpenInviteLink";
 import { Reveal } from "./Reveal";
 
 const display = Fraunces({
@@ -128,11 +130,17 @@ export default function VasudevanAthiraInvitationV2() {
           transition:
             opacity 1.15s cubic-bezier(0.22, 1, 0.36, 1),
             transform 1.15s cubic-bezier(0.22, 1, 0.36, 1);
-          will-change: opacity, transform;
         }
         .va2-reveal.va2-reveal-in {
           opacity: 1;
           transform: translate3d(0, 0, 0);
+        }
+        @supports (animation-timeline: view()) {
+          .va2-reveal:not(.va2-reveal-in) {
+            animation: va2-fade 1.15s cubic-bezier(0.22, 1, 0.36, 1) both;
+            animation-timeline: view();
+            animation-range: entry 0% cover 35%;
+          }
         }
         @media (prefers-reduced-motion: reduce) {
           .va2-reveal,
@@ -140,11 +148,13 @@ export default function VasudevanAthiraInvitationV2() {
             opacity: 1;
             transform: none;
             transition: none;
+            animation: none;
           }
         }
       `}</style>
 
-      <article className="mx-auto min-h-screen max-w-[460px] overflow-hidden bg-[#071210] md:my-10 md:min-h-0 md:shadow-[0_30px_80px_rgba(0,0,0,0.55)]">
+      <KeepTop />
+      <article className="mx-auto min-h-screen max-w-[460px] overflow-x-hidden bg-[#071210] md:my-10 md:min-h-0 md:shadow-[0_30px_80px_rgba(0,0,0,0.55)]">
         {/* Hero — phone frame only */}
         <section className="relative isolate min-h-[100svh] overflow-hidden md:min-h-[720px]">
           <img
@@ -178,13 +188,10 @@ export default function VasudevanAthiraInvitationV2() {
             <p className="va2-fade-3 mt-6 text-[15px] font-light leading-relaxed text-[#c5d4cc]">
               Saturday, 12 December 2026 · P.P Auditorium, Chalissery
             </p>
-            <a
-              href="#details"
-              className="va2-fade-3 mt-8 inline-flex items-center gap-3 text-[11px] font-medium uppercase tracking-[0.28em] text-[#e8efe9]"
-            >
+            <OpenInviteLink className="va2-fade-3 mt-8 inline-flex items-center gap-3 text-[11px] font-medium uppercase tracking-[0.28em] text-[#e8efe9]">
               <span className="va2-draw h-px w-10 bg-[#c9b896]" aria-hidden />
               Open invitation
-            </a>
+            </OpenInviteLink>
           </div>
         </section>
 

@@ -10,8 +10,12 @@ type RevealProps = {
 
 function isInView(el: HTMLElement) {
   const rect = el.getBoundingClientRect();
-  const vh = window.innerHeight || document.documentElement.clientHeight;
-  return rect.top < vh * 0.92 && rect.bottom > vh * 0.08;
+  const vh =
+    window.visualViewport?.height ||
+    window.innerHeight ||
+    document.documentElement.clientHeight;
+  // Generous on mobile — trigger as soon as it enters the lower/upper band.
+  return rect.top < vh * 0.96 && rect.bottom > 0;
 }
 
 export function Reveal({ children, className = "", delayMs = 0 }: RevealProps) {
@@ -21,10 +25,37 @@ export function Reveal({ children, className = "", delayMs = 0 }: RevealProps) {
     const el = ref.current;
     if (!el) return;
 
-    el.style.transitionDelay = `${delayMs}ms`;
+    let done = false;
+    let raf = 0;
 
     const show = () => {
+      if (done) return;
+      done = true;
+      el.style.transitionDelay = `${delayMs}ms`;
       el.classList.add("va2-reveal-in");
+      cleanup();
+    };
+
+    const check = () => {
+      if (!done && isInView(el)) show();
+    };
+
+    const onScrollOrTouch = () => {
+      if (done) return;
+      if (raf) return;
+      raf = window.requestAnimationFrame(() => {
+        raf = 0;
+        check();
+      });
+    };
+
+    const observers: IntersectionObserver[] = [];
+    const cleanupFns: Array<() => void> = [];
+
+    const cleanup = () => {
+      if (raf) window.cancelAnimationFrame(raf);
+      observers.forEach((o) => o.disconnect());
+      cleanupFns.forEach((fn) => fn());
     };
 
     if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
@@ -32,52 +63,54 @@ export function Reveal({ children, className = "", delayMs = 0 }: RevealProps) {
       return;
     }
 
-    // Immediate check helps iOS when content is already on screen after layout.
-    const frame = window.requestAnimationFrame(() => {
-      if (isInView(el)) show();
-    });
-
-    if (typeof IntersectionObserver === "undefined") {
-      show();
-      return () => window.cancelAnimationFrame(frame);
+    // 1) IntersectionObserver (desktop + modern mobile)
+    if (typeof IntersectionObserver !== "undefined") {
+      const obs = new IntersectionObserver(
+        (entries) => {
+          if (entries.some((e) => e.isIntersecting || e.intersectionRatio > 0)) {
+            show();
+          }
+        },
+        { root: null, threshold: [0, 0.01, 0.1], rootMargin: "120px 0px 120px 0px" },
+      );
+      obs.observe(el);
+      observers.push(obs);
     }
 
-    const obs = new IntersectionObserver(
-      (entries) => {
-        for (const entry of entries) {
-          if (!entry.isIntersecting) continue;
-          show();
-          obs.unobserve(el);
-          break;
-        }
-      },
-      {
-        // Pixel margins — % rootMargin is flaky on mobile Safari.
-        root: null,
-        threshold: [0, 0.05, 0.15],
-        rootMargin: "80px 0px 80px 0px",
-      },
-    );
+    // 2) iOS often delays window "scroll" until momentum ends — also listen to touch + visualViewport
+    const opts: AddEventListenerOptions = { passive: true, capture: true };
+    window.addEventListener("scroll", onScrollOrTouch, opts);
+    document.addEventListener("scroll", onScrollOrTouch, opts);
+    document.addEventListener("touchmove", onScrollOrTouch, opts);
+    document.addEventListener("touchend", onScrollOrTouch, opts);
+    window.visualViewport?.addEventListener("scroll", onScrollOrTouch);
+    window.visualViewport?.addEventListener("resize", onScrollOrTouch);
+    window.addEventListener("resize", onScrollOrTouch, opts);
 
-    obs.observe(el);
+    cleanupFns.push(() => {
+      window.removeEventListener("scroll", onScrollOrTouch, true);
+      document.removeEventListener("scroll", onScrollOrTouch, true);
+      document.removeEventListener("touchmove", onScrollOrTouch, true);
+      document.removeEventListener("touchend", onScrollOrTouch, true);
+      window.visualViewport?.removeEventListener("scroll", onScrollOrTouch);
+      window.visualViewport?.removeEventListener("resize", onScrollOrTouch);
+      window.removeEventListener("resize", onScrollOrTouch, true);
+    });
 
-    // Scroll/resize fallback for browsers that miss IO callbacks while scrolling.
-    const onScroll = () => {
-      if (!el.classList.contains("va2-reveal-in") && isInView(el)) {
-        show();
-        window.removeEventListener("scroll", onScroll, true);
-        window.removeEventListener("resize", onScroll);
-      }
-    };
-    window.addEventListener("scroll", onScroll, { passive: true, capture: true });
-    window.addEventListener("resize", onScroll, { passive: true });
+    // 3) Periodic check while the page is alive (cheap; stops after reveal)
+    const interval = window.setInterval(check, 400);
+    cleanupFns.push(() => window.clearInterval(interval));
 
-    return () => {
-      window.cancelAnimationFrame(frame);
-      obs.disconnect();
-      window.removeEventListener("scroll", onScroll, true);
-      window.removeEventListener("resize", onScroll);
-    };
+    // Initial layout pass
+    check();
+    const t1 = window.setTimeout(check, 100);
+    const t2 = window.setTimeout(check, 400);
+    cleanupFns.push(() => {
+      window.clearTimeout(t1);
+      window.clearTimeout(t2);
+    });
+
+    return cleanup;
   }, [delayMs]);
 
   return (
