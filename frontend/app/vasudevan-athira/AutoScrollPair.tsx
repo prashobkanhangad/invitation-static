@@ -12,7 +12,7 @@ type Photo = {
 const HOLD_MS = 3800;
 const SLIDE_MS = 1100;
 const SLIDE_WIDTH = 0.76;
-const GAP_PX = 8;
+const GAP_PX = 5.5;
 // Shared frame for all slides (matches close/lantern). Cover crops alcove slightly — no stretch.
 const BOX_RATIO = 1067 / 1440;
 

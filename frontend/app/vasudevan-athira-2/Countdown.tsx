@@ -41,21 +41,21 @@ export function Countdown({ numeralClass }: { numeralClass: string }) {
   const done = time !== null && WEDDING - Date.now() <= 0;
 
   return (
-    <div className="mt-10" aria-live="polite">
-      <p className="text-[11px] font-light uppercase tracking-[0.38em] text-[#9bb0a4]">
-        {done ? "The celebration has begun" : "Counting down"}
+    <div className="mt-8" aria-live="polite">
+      <p className="text-[11px] font-light uppercase tracking-[0.34em] text-[#9a7a55]">
+        {done ? "The celebration has begun" : "Until we wed"}
       </p>
       {done ? null : (
-        <dl className="mt-6 grid grid-cols-4 gap-2">
+        <dl className="mx-auto mt-5 grid max-w-[340px] grid-cols-4 gap-2">
           {units.map((unit) => (
             <div key={unit.key} className="text-center">
               <dt className="sr-only">{unit.label}</dt>
               <dd
-                className={`${numeralClass} text-[1.85rem] font-normal leading-none tabular-nums text-[#e8efe9]`}
+                className={`${numeralClass} text-[1.85rem] font-medium leading-none tabular-nums text-[#5a1520]`}
               >
                 {time ? String(time[unit.key]).padStart(2, "0") : "––"}
               </dd>
-              <dd className="mt-2 text-[10px] font-light uppercase tracking-[0.2em] text-[#7f968a]">
+              <dd className="mt-2 text-[10px] font-light uppercase tracking-[0.18em] text-[#9a7a55]">
                 {unit.label}
               </dd>
             </div>
