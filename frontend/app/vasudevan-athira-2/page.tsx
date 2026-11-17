@@ -98,9 +98,9 @@ const gallery = [
   },
   {
     src: "/vasudevan/web/04-lantern.jpg",
-    alt: "Vasudevan and Athira under warm lantern light",
-    width: 1067,
-    height: 1440,
+    alt: "Vasudevan and Athira in a warm lantern-lit moment",
+    width: 1600,
+    height: 1067,
   },
   {
     src: "/vasudevan/web/06-close.jpg",

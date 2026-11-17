@@ -74,6 +74,17 @@ export const metadata: Metadata = {
 const MAP =
   "https://www.google.com/maps/search/?api=1&query=P.P+Auditorium+Chalissery+Palakkad";
 
+/** 12 Dec 2026 — wedding day at P.P Auditorium */
+const WEDDING_CALENDAR =
+  "https://calendar.google.com/calendar/render?action=TEMPLATE&text=Vasudevan%20%26%20Athira%20—%20Wedding&dates=20261212/20261213&details=Wedding%20of%20Vasudevan%20%26%20Athira%20at%20P.P%20Auditorium%2C%20Chalissery%2C%20Palakkad.&location=P.P%20Auditorium%2C%20Chalissery%2C%20Palakkad&ctz=Asia%2FKolkata";
+
+const RECEPTION_MAP =
+  "https://www.google.com/maps/search/?api=1&query=N.S.S.+Auditorium";
+
+/** 16 Dec 2026, 10:30 IST onwards — Google Calendar template */
+const RECEPTION_CALENDAR =
+  "https://calendar.google.com/calendar/render?action=TEMPLATE&text=Vasudevan%20%26%20Athira%20—%20Wedding%20Reception&dates=20261216T103000/20261216T140000&details=Wedding%20reception%20of%20Vasudevan%20%26%20Athira%20at%20N.S.S.%20Auditorium.%2010%3A30%20AM%20onwards.&location=N.S.S.%20Auditorium&ctz=Asia%2FKolkata";
+
 export default function VasudevanAthiraInvitationV2() {
   return (
     <main
@@ -249,6 +260,14 @@ export default function VasudevanAthiraInvitationV2() {
               <p className="mt-2 text-[14px] font-light tracking-[0.08em] text-[#c9b896]">
                 December 2026 · Saturday
               </p>
+              <a
+                href={WEDDING_CALENDAR}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="mt-4 inline-block text-[11px] uppercase tracking-[0.24em] text-[#c9b896] underline decoration-[#3d5248] underline-offset-4"
+              >
+                Add to calendar
+              </a>
             </Reveal>
             <Reveal delayMs={140}>
               <p
@@ -283,6 +302,100 @@ export default function VasudevanAthiraInvitationV2() {
             loading="lazy"
             className="va2-photo h-auto w-full"
           />
+        </section>
+
+        <section
+          className="relative overflow-hidden px-6 py-16"
+          style={{
+            background:
+              "radial-gradient(ellipse at 70% 0%, rgba(201,184,150,0.1), transparent 50%), radial-gradient(ellipse at 10% 100%, rgba(196,120,106,0.1), transparent 45%), #0a1612",
+          }}
+        >
+          <Reveal>
+            <p className="text-[10px] font-medium uppercase tracking-[0.34em] text-[#c4786a]">
+              Reception
+            </p>
+            <div
+              className="mx-auto mt-5 h-px w-14 bg-gradient-to-r from-transparent via-[#c9b896] to-transparent"
+              aria-hidden
+            />
+            <p
+              className={`${display.className} mt-7 text-[1.4rem] font-light italic leading-snug text-[#e8efe9]`}
+            >
+              You are cordially invited to attend the wedding reception that
+              follows, with your family, and bless the couple.
+            </p>
+            <div
+              className="mx-auto mt-8 text-[1.35rem] leading-none text-[#c9b896]/70"
+              aria-hidden
+            >
+              ❧
+            </div>
+          </Reveal>
+
+          <div className="mt-10 grid gap-8 sm:grid-cols-3 sm:gap-4">
+            <Reveal delayMs={100}>
+              <div className="flex flex-col items-center text-center sm:border-r sm:border-[#c9b896]/25 sm:pr-4">
+                <p className="text-[10px] font-medium uppercase tracking-[0.28em] text-[#c9b896]">
+                  Date
+                </p>
+                <p
+                  className={`${display.className} mt-3 text-[1.2rem] font-normal leading-snug text-[#e8efe9]`}
+                >
+                  16 December 2026
+                </p>
+                <p className="mt-1 text-[13px] font-light text-[#9bb0a4]">
+                  Wednesday
+                </p>
+              </div>
+            </Reveal>
+            <Reveal delayMs={160}>
+              <div className="flex flex-col items-center text-center sm:border-r sm:border-[#c9b896]/25 sm:px-4">
+                <p className="text-[10px] font-medium uppercase tracking-[0.28em] text-[#c9b896]">
+                  Venue
+                </p>
+                <p
+                  className={`${display.className} mt-3 text-[1.2rem] font-normal leading-snug text-[#e8efe9]`}
+                >
+                  N.S.S. Auditorium
+                </p>
+                <a
+                  href={RECEPTION_MAP}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="mt-3 inline-block text-[11px] uppercase tracking-[0.22em] text-[#c9b896] underline decoration-[#3d5248] underline-offset-4"
+                >
+                  Get directions
+                </a>
+              </div>
+            </Reveal>
+            <Reveal delayMs={220}>
+              <div className="flex flex-col items-center text-center sm:pl-4">
+                <p className="text-[10px] font-medium uppercase tracking-[0.28em] text-[#c9b896]">
+                  Time
+                </p>
+                <p
+                  className={`${display.className} mt-3 text-[1.2rem] font-normal leading-snug text-[#e8efe9]`}
+                >
+                  10:30 AM
+                </p>
+                <p className="mt-1 text-[13px] font-light text-[#9bb0a4]">
+                  onwards
+                </p>
+                <a
+                  href={RECEPTION_CALENDAR}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="mt-3 inline-block text-[11px] uppercase tracking-[0.22em] text-[#c9b896] underline decoration-[#3d5248] underline-offset-4"
+                >
+                  Add to calendar
+                </a>
+              </div>
+            </Reveal>
+          </div>
+        </section>
+
+        <section className="flex flex-col gap-1 bg-[#071210]">
           <img
             src="/vasudevan/web/05-veena.jpg"
             alt="Vasudevan and Athira with a veena and mirror"
@@ -344,9 +457,9 @@ export default function VasudevanAthiraInvitationV2() {
               },
               {
                 src: "/vasudevan/web/04-lantern.jpg",
-                alt: "Vasudevan and Athira under warm lantern light",
-                width: 1067,
-                height: 1440,
+                alt: "Vasudevan and Athira in a warm lantern-lit moment",
+                width: 1600,
+                height: 1067,
               },
               {
                 src: "/vasudevan/web/03-alcove.jpg",
