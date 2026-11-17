@@ -100,19 +100,19 @@ const gallery = [
     src: "/vasudevan/web/04-lantern.jpg",
     alt: "Vasudevan and Athira under warm lantern light",
     width: 1067,
-    height: 1600,
+    height: 1440,
   },
   {
     src: "/vasudevan/web/06-close.jpg",
     alt: "Vasudevan and Athira in a close embrace",
     width: 1067,
-    height: 1600,
+    height: 1440,
   },
   {
     src: "/vasudevan/web/05-veena.jpg",
     alt: "Vasudevan and Athira with a veena and mirror",
     width: 1067,
-    height: 1600,
+    height: 1440,
   },
   {
     src: "/vasudevan/web/07-glow.jpg",
@@ -145,17 +145,40 @@ export default function VasudevanAthiraInvitation() {
         .va-fade-later { animation: va-fade-up 1.1s cubic-bezier(0.22, 1, 0.36, 1) 0.36s both; }
         .va-rise { animation: va-soft-rise 1.25s cubic-bezier(0.22, 1, 0.36, 1) 0.2s both; }
         .va-line { transform-origin: center; animation: va-line 1s ease 0.45s both; }
+        .va-grade-img {
+          filter: contrast(1.08) saturate(0.86) brightness(0.96);
+        }
+        .va-grade-layer {
+          pointer-events: none;
+          position: absolute;
+          inset: 0;
+          background:
+            radial-gradient(ellipse at 50% 42%, transparent 38%, rgba(18, 8, 12, 0.42) 100%),
+            linear-gradient(165deg, rgba(42, 78, 92, 0.22) 0%, transparent 42%, rgba(92, 36, 28, 0.28) 100%),
+            linear-gradient(0deg, rgba(196, 150, 90, 0.12), rgba(26, 12, 16, 0.08));
+          mix-blend-mode: soft-light;
+        }
+        .va-grade-layer::after {
+          content: "";
+          position: absolute;
+          inset: 0;
+          background: linear-gradient(180deg, rgba(26, 12, 16, 0.12) 0%, transparent 28%, transparent 72%, rgba(26, 12, 16, 0.18) 100%);
+          mix-blend-mode: multiply;
+        }
       `}</style>
 
       <article className="mx-auto min-h-screen max-w-[460px] overflow-hidden bg-[#f4ebe1] md:my-10 md:min-h-0 md:shadow-[0_30px_80px_rgba(26,12,16,0.45)]">
         <section className="relative">
-          <img
-            src="/vasudevan/web/02-pond.jpg"
-            alt="Vasudevan and Athira by the temple pond"
-            width={1067}
-            height={1600}
-            className="va-rise h-auto w-full"
-          />
+          <div className="va-rise relative">
+            <img
+              src="/vasudevan/web/02-pond.jpg"
+              alt="Vasudevan and Athira by the temple pond"
+              width={1067}
+              height={1600}
+              className="va-grade-img h-auto w-full"
+            />
+            <div className="va-grade-layer" aria-hidden />
+          </div>
           <div className="pointer-events-none absolute inset-x-0 top-0 h-44 bg-gradient-to-b from-[#1a0c10]/55 to-transparent" />
           <div className="pointer-events-none absolute inset-x-0 bottom-0 h-36 bg-gradient-to-t from-[#f4ebe1] to-transparent" />
 
@@ -235,15 +258,17 @@ export default function VasudevanAthiraInvitation() {
 
         <section className="mt-10 flex flex-col gap-1">
           {gallery.map((photo) => (
-            <img
-              key={photo.src}
-              src={photo.src}
-              alt={photo.alt}
-              width={photo.width}
-              height={photo.height}
-              loading="lazy"
-              className="h-auto w-full"
-            />
+            <div key={photo.src} className="relative">
+              <img
+                src={photo.src}
+                alt={photo.alt}
+                width={photo.width}
+                height={photo.height}
+                loading="lazy"
+                className="va-grade-img h-auto w-full"
+              />
+              <div className="va-grade-layer" aria-hidden />
+            </div>
           ))}
         </section>
 
@@ -256,6 +281,14 @@ export default function VasudevanAthiraInvitation() {
             is our greatest blessing.
           </p>
           <div className="mt-10 flex flex-col items-center gap-3 text-[11px] font-light uppercase tracking-[0.22em] text-[#9a7a55]">
+            <a
+              href="https://www.instagram.com/vijith_krishna_photography"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="underline decoration-[#d7c4a8] underline-offset-4"
+            >
+              Vijith Krishna Photography
+            </a>
             <a
               href="https://invyto.in"
               target="_blank"
